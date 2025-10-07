@@ -1,27 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Personaje en Planeta con Three.js</title>
+    <title>Personaje en Planeta con Three.js - Juego de Supervivencia</title>
     <style>
-        body { margin: 0; }
-        #container { width: 100%; height: 100%; }
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #container { width: 100%; height: 100vh; position: relative; }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            z-index: 200;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
-    <div id="container"></div>
+    <div id="container">
+        <div id="ui">
+            <div>Tiempo: <span id="time">0</span>s</div>
+            <div>Golpes: <span id="hits">0</span>/3</div>
+        </div>
+        <div id="instructions">
+            Controles: A/D o flechas ←/→ para girar. W/Flecha ↑ para mover. Sobrevive el mayor tiempo posible evitando meteoritos.
+        </div>
+        <div id="gameOver">
+            <h2>¡Game Over!</h2>
+            <p>Tiempo sobrevivido: <span id="finalTime">0</span>s</p>
+            <button onclick="location.reload()">Reiniciar</button>
+        </div>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
     <script>
         // --- REFERENCIAS GLOBALES ---
-        var renderer, scene, camera, planeta, personaje, previousRadial;
+        var renderer, scene, camera, planeta, personaje, previousRadial, cube;
         var clock = new THREE.Clock();
 
         // --- GESTIÓN DE ANIMACIÓN ---
         var mixer;
         const actions = {}; 
         let activeAction; 
+
+        // --- ESTADO DEL JUEGO ---
+        let gameRunning = true;
+        let gameTime = 0;
+        let hits = 0;
+        const MAX_HITS = 3;
+        let obstacles = [];
+        let explosions = [];
 
         // --- CONSTANTES DE CONFIGURACIÓN ---
         const PLANET_RADIUS = 40;
@@ -32,6 +87,14 @@
         // --- CONSTANTES DE CÁMARA AJUSTADAS PARA VISTA MÁS INCLINADA Y LEJANA ---
         const CAMERA_DISTANCE = 35; // Aumentado para ver más del planeta
         const CAMERA_HEIGHT = 25;   // Aumentado para mayor elevación e inclinación
+
+        // --- CONFIGURACIÓN DE OBSTÁCULOS ---
+        const METEOR_SPAWN_RATE = 0.005; // Probabilidad por frame de spawnear un meteorito
+        const METEOR_SPEED = 150; // Velocidad de caída aumentada para movimiento más fluido
+        const METEOR_RADIUS = 1;
+        const EXPLOSION_RADIUS = 5;
+        const EXPLOSION_DURATION = 1; // Segundos
+        const COLLISION_DISTANCE = 2; // Distancia para colisión con meteorito o explosión
 
         // --- ESTADO DEL TECLADO ---
         var keysPressed = {};
@@ -46,29 +109,140 @@
         function init() {
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(new THREE.Color(0x111122));
+            renderer.setClearColor(new THREE.Color(0x000000)); // Fondo negro para estrellas
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
             document.getElementById('container').appendChild(renderer.domElement);
 
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
             
             // Posición inicial de cámara más lejana y elevada para apreciar el planeta completo con más inclinación
             camera.position.set(0, PLANET_RADIUS + CAMERA_HEIGHT + 10, 20);
             camera.lookAt(0, PLANET_RADIUS, 0);
             
-            scene.add(new THREE.AmbientLight(0x666666));
-            const luz = new THREE.DirectionalLight(0xffffff, 1);
-            luz.position.set(10, 10, 10);
-            scene.add(luz);
+            // Campo de estrellas mejorado con variación de tamaño y brillo
+            const starGeometry = new THREE.BufferGeometry();
+            const starCount = 20000;
+            const positions = new Float32Array(starCount * 3);
+            const sizes = new Float32Array(starCount);
+            const colors = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount; i++) {
+                const i3 = i * 3;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const r = 800 + Math.random() * 1200;
+                positions[i3] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+                positions[i3 + 2] = r * Math.cos(phi);
+                
+                sizes[i] = Math.random() * 3 + 1;
+                
+                // Colores variados para estrellas (blanco, azul, amarillo)
+                const color = new THREE.Color();
+                color.setHSL(Math.random() * 0.2 + 0.55, 0.5, Math.random() * 0.5 + 0.5);
+                colors[i3] = color.r;
+                colors[i3 + 1] = color.g;
+                colors[i3 + 2] = color.b;
+            }
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            starGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const starMaterial = new THREE.PointsMaterial({ 
+                size: 2, 
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: true 
+            });
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+            
+            // Luz ambiental sutil para no lavar las sombras
+            scene.add(new THREE.AmbientLight(0x404040, 0.2));
+            
+            // Sol principal como DirectionalLight con sombras mejoradas
+            const sunLight = new THREE.DirectionalLight(0xffddaa, 2.5);
+            sunLight.position.set(200, 150, 100); // Posición más lejana para mejor simulación
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 4096;
+            sunLight.shadow.mapSize.height = 4096;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 1000;
+            sunLight.shadow.camera.left = -PLANET_RADIUS * 3;
+            sunLight.shadow.camera.right = PLANET_RADIUS * 3;
+            sunLight.shadow.camera.top = PLANET_RADIUS * 3;
+            sunLight.shadow.camera.bottom = -PLANET_RADIUS * 3;
+            sunLight.shadow.bias = -0.0001;
+            sunLight.shadow.normalBias = 0.0005;
+            scene.add(sunLight);
+
+            // Sol visible: esfera central brillante
+            const sunGeometry = new THREE.SphereGeometry(8, 64, 64);
+            const sunMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffff88,
+                transparent: true,
+                opacity: 0.9
+            });
+            const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+            sun.position.copy(sunLight.position);
+            scene.add(sun);
+
+            // Glow exterior: esfera más grande con gradiente de opacidad
+            const glowGeometry = new THREE.SphereGeometry(25, 64, 64);
+            const glowMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffaa00, 
+                transparent: true, 
+                opacity: 0.4,
+                side: THREE.BackSide // Para que brille hacia adentro
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            glow.position.copy(sunLight.position);
+            scene.add(glow);
+
+            // Halo adicional: anillo rotatorio para efecto dinámico
+            const haloGeometry = new THREE.TorusGeometry(30, 2, 16, 100);
+            const haloMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.2 
+            });
+            const halo = new THREE.Mesh(haloGeometry, haloMaterial);
+            halo.position.copy(sunLight.position);
+            halo.rotation.x = Math.PI / 2;
+            scene.add(halo);
+
+            // Rotación sutil del halo para dinamismo
+            function animateHalo() {
+                if (halo) halo.rotation.z += 0.005;
+                requestAnimationFrame(animateHalo);
+            }
+            animateHalo();
+
+            // Luz puntual adicional cerca del sol para mayor brillo
+            const sunPointLight = new THREE.PointLight(0xffddaa, 1, 300);
+            sunPointLight.position.copy(sunLight.position);
+            scene.add(sunPointLight);
 
             window.addEventListener('resize', updateAspectRatio);
+
+            // Actualizar UI cada segundo
+            setInterval(updateUI, 1000);
         }
 
         function loadPlaneta(radio, texturaURL) {
-            const geometria = new THREE.SphereGeometry(radio, 64, 64);
+            const geometria = new THREE.SphereGeometry(radio, 128, 128); // Mayor resolución para mejor iluminación
             const textura = new THREE.TextureLoader().load(texturaURL);
-            const material = new THREE.MeshStandardMaterial({ map: textura });
+            const material = new THREE.MeshStandardMaterial({ 
+                map: textura,
+                metalness: 0.1,
+                roughness: 0.8
+            });
             planeta = new THREE.Mesh(geometria, material);
+            planeta.receiveShadow = true;
+            planeta.castShadow = true; // Para sombras en sí mismo si es necesario
             scene.add(planeta);
         }
 
@@ -79,16 +253,47 @@
                 personaje.scale.set(scale, scale, scale);
                 personaje.position.set(0, PLANET_RADIUS + CHARACTER_HEIGHT, 0);
                 
-                // Orientación inicial: alinear up con radial, yaw=0 (mirando hacia -Z)
+                // Orientación inicial corregida: primero alinear up con radial, luego yaw alrededor del nuevo up
                 const initialRadial = personaje.position.clone().normalize();
                 const quatUp = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), initialRadial);
-                const initialYaw = 0; // Ajusta a Math.PI si quieres que mire en dirección opuesta
+                const initialYaw = 0; // Ajusta si es necesario (e.g., Math.PI para opuesto)
                 const quatYaw = new THREE.Quaternion().setFromAxisAngle(initialRadial, initialYaw);
-                personaje.quaternion.copy(quatYaw.premultiply(quatUp));
+                const quat = quatUp.clone();
+                quat.premultiply(quatYaw); // Ahora quat = quatYaw * quatUp
+                personaje.quaternion.copy(quat);
                 
                 previousRadial = initialRadial.clone();
                 
+                // Habilitar sombras para el personaje
+                personaje.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        // Ajustar materiales para mejor iluminación
+                        if (child.material) {
+                            child.material.metalness = 0.2;
+                            child.material.roughness = 0.5;
+                        }
+                    }
+                });
+                
                 scene.add(personaje);
+
+                // Spawn cube in front of character
+                const radius = PLANET_RADIUS + CHARACTER_HEIGHT;
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(personaje.quaternion);
+                forward.projectOnPlane(initialRadial).normalize();
+                const distance = 20; // Distance ahead on surface
+                const cubePos = initialRadial.clone().add(forward.clone().multiplyScalar(distance)).normalize().multiplyScalar(radius);
+                const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+                const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+                cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+                cube.position.copy(cubePos);
+                cube.castShadow = true;
+                cube.receiveShadow = true;
+                scene.add(cube);
+
+                console.log('Cube spawned in front of character.');
 
                 mixer = new THREE.AnimationMixer(personaje);
                 const animationClips = gltf.animations;
@@ -107,7 +312,7 @@
                 }
                 
                 console.log('Animaciones encontradas:', Object.keys(actions));
-                if (actions['Walk']) setActiveAction(actions['Walk']); // Inicia con walk ya que se mueve siempre
+                if (actions['Idle']) setActiveAction(actions['Idle']); // Inicia con idle
 
                 console.log('✅ Personaje cargado correctamente.');
             }, undefined, function(error) {
@@ -129,31 +334,180 @@
             camera.updateProjectionMatrix();
         }
 
+        function updateUI() {
+            if (!gameRunning) return;
+            document.getElementById('time').textContent = Math.floor(gameTime);
+            document.getElementById('hits').textContent = hits;
+        }
+
+        function endGame() {
+            gameRunning = false;
+            document.getElementById('finalTime').textContent = Math.floor(gameTime);
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        // --- SPAWN DE METEORITOS ---
+        function spawnMeteor() {
+            if (!gameRunning || Math.random() > METEOR_SPAWN_RATE) return;
+
+            // Posición inicial aleatoria en una esfera grande alrededor del planeta
+            const spawnRadius = PLANET_RADIUS * 4; // Aumentado para spawns más lejanos
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1); // Distribución uniforme en esfera
+            const x = spawnRadius * Math.sin(phi) * Math.cos(theta);
+            const y = spawnRadius * Math.sin(phi) * Math.sin(theta);
+            const z = spawnRadius * Math.cos(phi);
+
+            const meteorGeometry = new THREE.SphereGeometry(METEOR_RADIUS, 16, 16); // Mayor detalle
+            const meteorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8B4513,
+                emissive: 0x331100,
+                emissiveIntensity: 0.2
+            });
+            const meteor = new THREE.Mesh(meteorGeometry, meteorMaterial);
+            meteor.castShadow = true;
+            meteor.receiveShadow = true;
+
+            meteor.position.set(x, y, z);
+            // Dirección hacia el centro del planeta (hacia 0,0,0)
+            const direction = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), meteor.position).normalize();
+            meteor.userData = { direction: direction, speed: METEOR_SPEED, isMeteor: true };
+
+            scene.add(meteor);
+            obstacles.push(meteor);
+        }
+
+        // --- ACTUALIZAR OBSTÁCULOS (MOVIMIENTO Y IMPACTO) ---
+        function updateObstacles(deltaTime) {
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                if (obs.userData.isMeteor) {
+                    // Mover en línea recta hacia el centro
+                    obs.position.add(obs.userData.direction.clone().multiplyScalar(obs.userData.speed * deltaTime));
+                    
+                    // Verificar impacto con el planeta
+                    if (obs.position.length() <= PLANET_RADIUS + METEOR_RADIUS) {
+                        const impactPos = obs.position.clone().normalize().multiplyScalar(PLANET_RADIUS);
+                        createExplosion(impactPos);
+                        scene.remove(obs);
+                        obstacles.splice(i, 1);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // --- CREAR EXPLOSIÓN MEJORADA ---
+        function createExplosion(position) {
+            const explosionGeometry = new THREE.SphereGeometry(EXPLOSION_RADIUS, 32, 32);
+            const explosionMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xFF4500, 
+                transparent: true, 
+                opacity: 0.8 
+            });
+            const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
+
+            explosion.position.copy(position);
+            explosion.userData = { 
+                startTime: clock.getElapsedTime(), 
+                duration: EXPLOSION_DURATION, 
+                isExplosion: true 
+            };
+
+            scene.add(explosion);
+            explosions.push(explosion);
+        }
+
+        // --- DETECCIÓN DE COLISIONES (SOLO CON PERSONAJE) ---
+        function checkCollisions() {
+            if (!personaje || !gameRunning) return;
+
+            const characterPos = personaje.position;
+
+            // Colisión con meteoritos
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                if (obs.userData.isMeteor) {
+                    const dist = characterPos.distanceTo(obs.position);
+                    if (dist < COLLISION_DISTANCE) {
+                        // Golpe por meteorito directo
+                        takeHit();
+                        // Crear explosión en posición del meteorito
+                        createExplosion(obs.position);
+                        scene.remove(obs);
+                        obstacles.splice(i, 1);
+                    }
+                }
+            }
+
+            // Colisión con explosiones
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const exp = explosions[i];
+                if (exp.userData.isExplosion) {
+                    const dist = characterPos.distanceTo(exp.position);
+                    const currentRadius = EXPLOSION_RADIUS * exp.scale.x;
+                    if (dist < COLLISION_DISTANCE + currentRadius) {
+                        takeHit();
+                    }
+                }
+            }
+        }
+
+        function takeHit() {
+            hits++;
+            document.getElementById('hits').textContent = hits;
+            if (hits >= MAX_HITS) {
+                endGame();
+            }
+        }
+
         function update() {
             const deltaTime = clock.getDelta();
+            gameTime += deltaTime;
             if (mixer) mixer.update(deltaTime);
             if (personaje) {
                 updateCharacter(deltaTime);
                 updateCamera();
             }
+            if (gameRunning) {
+                spawnMeteor();
+                updateObstacles(deltaTime);
+                checkCollisions();
+            }
+
+            // Actualizar explosiones
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const exp = explosions[i];
+                const elapsed = clock.getElapsedTime() - exp.userData.startTime;
+                const progress = elapsed / exp.userData.duration;
+                if (progress >= 1) {
+                    scene.remove(exp);
+                    explosions.splice(i, 1);
+                } else {
+                    exp.scale.setScalar(1 + progress * 3); // Expansión más dramática
+                    exp.material.opacity = Math.max(0, 0.8 * (1 - progress));
+                    // Cambio de color hacia el final para efecto de enfriamiento
+                    if (progress > 0.5) {
+                        exp.material.color.setHSL(0, 1, (1 - progress) * 0.5);
+                    }
+                }
+            }
+
+            // Update cube position to always be in front of character
+            if (cube && personaje) {
+                const currentRadial = personaje.position.clone().normalize();
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(personaje.quaternion);
+                forward.projectOnPlane(currentRadial).normalize();
+                const distance = 20;
+                const cubePos = currentRadial.clone().add(forward.clone().multiplyScalar(distance)).normalize().multiplyScalar(PLANET_RADIUS + CHARACTER_HEIGHT);
+                cube.position.copy(cubePos);
+            }
         }
 
-        // --- CONTROLADOR DE PERSONAJE: MOVIMIENTO CONSTANTE ADELANTE + GIRO CON TECLAS ---
+        // --- CONTROLADOR DE PERSONAJE: MOVIMIENTO SIMPLIFICADO ---
         function updateCharacter(deltaTime) {
             const currentRadial = personaje.position.clone().normalize();
-
-            // Dirección forward local transformada a world ( +Z para adelante correcto)
-            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(personaje.quaternion);
-            forward.projectOnPlane(currentRadial).normalize();
-
-            // Movimiento constante hacia adelante
-            const moveVector = forward.clone().multiplyScalar(FORWARD_SPEED * deltaTime);
-            personaje.position.add(moveVector);
-
-            // Mantener animación de Walk siempre activa ya que el personaje se mueve constantemente
-            if (actions['Walk'] && activeAction !== actions['Walk']) {
-                setActiveAction(actions['Walk']);
-            }
+            const isMoving = keysPressed['w'] || keysPressed['arrowup'];
 
             // Giro con A/D o flechas izquierda/derecha (cambiar dirección)
             if (keysPressed['a'] || keysPressed['arrowleft']) {
@@ -175,19 +529,33 @@
                 personaje.quaternion.premultiply(rotation);
             }
 
-            // Proyectar de vuelta a la esfera
-            const oldRadial = previousRadial.clone();
-            personaje.position.normalize().multiplyScalar(PLANET_RADIUS + CHARACTER_HEIGHT);
-            const newRadial = personaje.position.clone().normalize();
+            // Dirección forward local transformada a world (-Z para adelante, estándar glTF)
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(personaje.quaternion);
+            forward.projectOnPlane(currentRadial).normalize();
 
-            // Corrección para alinear el nuevo up
-            if (!oldRadial.equals(newRadial)) {
-                const correction = new THREE.Quaternion().setFromUnitVectors(oldRadial, newRadial);
-                personaje.quaternion.premultiply(correction);
+            if (isMoving) {
+                // Movimiento: agregar vector y proyectar de vuelta a la esfera
+                const moveVector = forward.clone().multiplyScalar(FORWARD_SPEED * deltaTime);
+                const oldRadial = previousRadial.clone();
+                personaje.position.add(moveVector);
+                personaje.position.normalize().multiplyScalar(PLANET_RADIUS + CHARACTER_HEIGHT);
+                const newRadial = personaje.position.clone().normalize();
+
+                // Mantener animación de Walk activa solo si se mueve
+                if (actions['Walk']) setActiveAction(actions['Walk']);
+
+                // Corrección para alinear el nuevo up
+                if (!oldRadial.equals(newRadial)) {
+                    const correction = new THREE.Quaternion().setFromUnitVectors(oldRadial, newRadial);
+                    personaje.quaternion.premultiply(correction);
+                }
+
+                // Actualizar previousRadial
+                previousRadial.copy(newRadial);
+            } else {
+                // Animación de Idle si no se mueve
+                if (actions['Idle']) setActiveAction(actions['Idle']);
             }
-
-            // Actualizar previousRadial
-            previousRadial.copy(newRadial);
         }
 
         function updateCamera() {
