@@ -286,6 +286,7 @@
         const CAMERA_DISTANCE = 1000;
         const CAMERA_HEIGHT = 700;
         const STATIC_COLLISION_DISTANCE = 0.8;
+        const TREE_COLLISION_DISTANCE = 5;
         const SHRINK_AMOUNT = 1.0;
         const WIN_RADIUS = 5;
         const BLAST_DAMAGE_RADIUS = 3.0;
@@ -574,7 +575,7 @@
                 });
                 treeTemplate.scale.set(3, 3, 3); // Escala razonable para GLTF (ajusta según el tamaño de tu modelo; prueba 0.1-2.0)
 
-                const numTrees = 100; // Reducido para mejor rendimiento con escalas grandes
+                const numTrees = 200; // Reducido para mejor rendimiento con escalas grandes
                 for (let i = 0; i < numTrees; i++) {
                     const tree = treeTemplate.clone();
                     tree.traverse((child) => {
@@ -597,7 +598,7 @@
                     tree.castShadow = true;
                     tree.receiveShadow = true;
                     // Offset para evitar que se entierren
-                    const treeOffset = tree.scale.y + 1.0;
+                    const treeOffset = CHARACTER_HEIGHT + 4;
                     tree.position.add(radial.clone().multiplyScalar(treeOffset));
                     tree.userData = {
                         isTree: true,
@@ -615,7 +616,7 @@
             });
 
             // Zonas de lava mejoradas con glow y partículas
-            const numLava = 400; // Más zonas
+            const numLava = 200; // Más zonas
             for (let i = 0; i < numLava; i++) {
                 const lavaRadius = 1.0; // Aumentado para más cobertura
                 const lavaGeo = new THREE.SphereGeometry(lavaRadius, 16, 16);
@@ -685,7 +686,7 @@
                 const radial = pos.clone().normalize();
                 const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
                 tree.quaternion.copy(quat);
-                const treeOffset = treeHeight + 1.0;
+                const treeOffset = CHARACTER_HEIGHT;
                 tree.position.add(radial.clone().multiplyScalar(treeOffset));
                 tree.userData = {
                     isTree: true,
@@ -1308,8 +1309,12 @@
         // --- DETECCIÓN DE COLISIONES ESTÁTICAS ---
         function checkStaticCollisions(newPos) {
             for (let staticObj of staticObstacles) {
+                let collisionDist = STATIC_COLLISION_DISTANCE;
+                if (staticObj.userData && staticObj.userData.isTree) {
+                    collisionDist = TREE_COLLISION_DISTANCE;
+                }
                 const dist = newPos.distanceTo(staticObj.position);
-                if (dist < STATIC_COLLISION_DISTANCE) {
+                if (dist < collisionDist) {
                     return true;
                 }
             }
