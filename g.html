@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Personaje en Planeta con Three.js - Juego de Supervivencia</title>
+    <title>Planet Invasion Survival con Three.js - Juego de Supervivencia</title>
     <style>
         * {
             margin: 0;
@@ -297,57 +297,47 @@
     <div id="container">
         <div id="ui">
             <div><span>Tiempo:</span> <span id="time">0</span>s</div>
-            <div><span>Puntuación:</span> <span id="score">0</span></div>
+            <div><span>SCORE:</span> <span id="score">0</span></div>
             <div><span>Golpes:</span> <span id="hits">0</span>/3</div>
             <div id="healthBar">
                 <div id="healthFill"></div>
             </div>
             <div><span>Radio Planeta:</span> <span id="planetRadius">40</span></div>
-            <div id="invulnIndicator">⚡ ¡INVULNERABLE!</div>
-            <div id="lavaWarning">🔥 ¡EN LAVA! Daño continuo...</div>
+            <div id="invulnIndicator">INVULNERABLE!</div>
+            <div id="lavaWarning">EN LAVA! Daño continuo...</div>
         </div>
         
         <div id="instructions">
-            <strong>🎮 Controles:</strong><br>
-            W/↑: Mover adelante<br>
-            A/D o ←/→: Girar<br>
-            S/↓: Revertir dirección<br><br>
-            <strong>🎯 Objetivo:</strong><br>
+            <strong>Controles:</strong><br>
+            W: Mover adelante<br>
+            A/D: Girar<br>
+            S: Vuelta 180 grados<br><br>
+            <strong>Objetivo:</strong><br>
             Sobrevive mientras el planeta se encoge cada 10s!<br>
             Colecciona power-ups para curarte.<br>
             Evita meteoritos, lava y enemigos.<br>
-            <small>¡Gana sobreviviendo hasta radio 5!</small>
-        </div>
-        
-        <div id="tips">
-            <strong>💡 Consejos:</strong><br>
-            • Meteoritos dejan rastro naranja<br>
-            • Explosiones dañan en área<br>
-            • Power-ups azules curan<br>
-            • Lava daña periódicamente<br>
-            • ¡Enemigos rojos salen de lava!<br>
-            • Destruye enemigos por puntos extra
+            <small>Gana sobreviviendo hasta radio 5!</small>
         </div>
         
         <div id="minimap"></div>
         
         <div id="gameOver">
-            <h2>💀 ¡GAME OVER!</h2>
+            <h2>GAME OVER!</h2>
             <p>Tiempo sobrevivido: <span id="finalTime">0</span>s</p>
-            <p>Puntuación final: <span id="finalScore">0</span></p>
-            <p>Mejor puntuación: <span id="bestScore">0</span></p>
-            <button id="restartBtn" onclick="location.reload()">🔄 Reiniciar</button>
+            <p>SCORE final: <span id="finalScore">0</span></p>
+            <p>Mejor SCORE: <span id="bestScore">0</span></p>
+            <button id="restartBtn" onclick="location.reload()">Reiniciar</button>
         </div>
         
         <div id="winScreen">
-            <h2>🏆 ¡VICTORIA!</h2>
+            <h2>VICTORIA!</h2>
             <p>Tiempo: <span id="winTime">0</span>s</p>
-            <p>Puntuación: <span id="winScore">0</span></p>
-            <button id="restartBtn" onclick="location.reload()">🎮 Jugar de nuevo</button>
+            <p>SCORE: <span id="winScore">0</span></p>
+            <button id="restartBtn" onclick="location.reload()">Jugar de nuevo</button>
         </div>
         
         <div id="loading">
-            <h2>🌍 Cargando planeta...</h2>
+            <h2>Cargando planeta...</h2>
             <div class="spinner"></div>
             <p>Por favor espera.</p>
         </div>
@@ -490,8 +480,8 @@
         const CAMERA_HEIGHT = 700;
         const STATIC_COLLISION_DISTANCE = 0.8;
         const TREE_COLLISION_DISTANCE = 5;
-        const SHRINK_AMOUNT = 1.0;
-        const WIN_RADIUS = 5;
+        const SHRINK_AMOUNT = 5.0;
+        const WIN_RADIUS = 5.0;
         const BLAST_DAMAGE_RADIUS = 3.0;
 
         // --- CONFIGURACIÓN DE OBSTÁCULOS MEJORADA ---
