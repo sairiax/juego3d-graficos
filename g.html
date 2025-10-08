@@ -162,6 +162,19 @@
             font-size: 12px;
             max-width: 200px;
         }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            z-index: 200;
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -209,10 +222,16 @@
             <p>Puntuacion: <span id="winScore">0</span></p>
             <button id="restartBtn" onclick="location.reload()">Jugar de nuevo</button>
         </div>
+        <div id="loading">
+            <h2>Cargando modelos...</h2>
+            <p>Por favor espera.</p>
+        </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="js/FBXLoader.js"></script>
+    <script src="js/inflate.min.js"></script>
 
     <script>
         // --- REFERENCIAS GLOBALES ---
@@ -252,15 +271,20 @@
         let lavaDamageTimer = 0;
         const LAVA_DAMAGE_INTERVAL = 0.5; // Reducido para daño más frecuente
 
+        // Seguimiento de carga de modelos
+        const modelsToLoad = 7; // player model + 2 anims + 3 enemies + tree
+        let modelsLoaded = 0;
+        let isInitialized = false;
+
         // --- CONSTANTES DE CONFIGURACIÓN ---
         const originalPlanetRadius = 40;
         let currentPlanetRadius = originalPlanetRadius;
-        const CHARACTER_HEIGHT = 0.15;
-        const CHARACTER_SCALE = 0.3;
-        const FORWARD_SPEED = 3.0;
+        const CHARACTER_HEIGHT = 0.5;
+        const CHARACTER_SCALE = 0.02;
+        const FORWARD_SPEED = 10.0;
         const TURN_SPEED = 2.0;
-        const CAMERA_DISTANCE = 35;
-        const CAMERA_HEIGHT = 25;
+        const CAMERA_DISTANCE = 1000;
+        const CAMERA_HEIGHT = 700;
         const STATIC_COLLISION_DISTANCE = 0.8;
         const SHRINK_AMOUNT = 1.0;
         const WIN_RADIUS = 5;
@@ -287,10 +311,13 @@
         const ENEMY_SPEED = 1.5; // Velocidad base
         const ENEMY_RADIUS = 0.8;
         const ENEMY_TYPES = [
-            { name: 'chaser', shape: THREE.SphereGeometry, size: 0.8, color: 0xff0000, speed: 1.5, behavior: 'chase' },
-            { name: 'brute', shape: THREE.BoxGeometry, size: [1.2, 1.2, 1.2], color: 0x800000, speed: 0.8, behavior: 'chase' },
-            { name: 'jumper', shape: THREE.ConeGeometry, size: [0.6, 1.5], color: 0xff00ff, speed: 1.2, behavior: 'jump' }
+            { name: 'chaser', model: 'models/e1.glb', scale: 2.0, color: 0xff0000, speed: 1.5, behavior: 'chase' },
+            { name: 'brute', model: 'models/e2.glb', scale: 1.5, color: 0x800000, speed: 0.8, behavior: 'chase' },
+            { name: 'jumper', model: 'models/e3.glb', scale: 1.8, color: 0xff00ff, speed: 1.2, behavior: 'jump' }
         ];
+        
+        // Cache de modelos de enemigos
+        const enemyModels = {};
 
         // Minimap
         let minimapRenderer, minimapCamera;
@@ -302,7 +329,7 @@
             keysPressed[event.key.toLowerCase()] = true;
             if (event.key.toLowerCase() === ' ') {
                 event.preventDefault();
-                if (gameRunning) {
+                if (gameRunning && isInitialized) {
                     attemptShrinkPlanet();
                 }
             }
@@ -313,8 +340,18 @@
 
         init();
         loadPlaneta(originalPlanetRadius, 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg');
-        loadPersonajeGLB('https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb', CHARACTER_SCALE);
+        loadPersonaje('models/c.fbx', CHARACTER_SCALE);
+        preloadEnemyModels();
         render();
+
+        function modelLoaded() {
+            modelsLoaded++;
+            if (modelsLoaded === modelsToLoad) {
+                isInitialized = true;
+                document.getElementById('loading').style.display = 'none';
+                console.log('All models loaded');
+            }
+        }
 
         function init() {
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -474,6 +511,48 @@
             setInterval(updateUI, 100);
         }
 
+        function createProceduralTrees(radio) {
+            // Fallback procedural trees
+            const numTrees = 80;
+            for (let i = 0; i < numTrees; i++) {
+                const treeHeight = 2 + Math.random() * 3;
+                const trunkGeo = new THREE.CylinderGeometry(0.1, 0.2, treeHeight, 8);
+                const trunkMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x8B4513,
+                    roughness: 0.8
+                });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                const leavesGeo = new THREE.SphereGeometry(1, 8, 8);
+                const leavesMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x228B22,
+                    roughness: 0.7
+                });
+                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+                leaves.position.y = treeHeight / 2 + 0.5;
+                const treeGroup = new THREE.Group();
+                treeGroup.add(trunk);
+                treeGroup.add(leaves);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const pos = new THREE.Vector3(
+                    radio * Math.sin(phi) * Math.cos(theta),
+                    radio * Math.sin(phi) * Math.sin(theta),
+                    radio * Math.cos(phi)
+                );
+                treeGroup.position.copy(pos);
+                treeGroup.userData.originalPosition = pos.clone();
+                const radial = pos.clone().normalize();
+                const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+                treeGroup.quaternion.copy(quat);
+                treeGroup.scale.set(3, 3, 3); // Escala aumentada para árboles más grandes
+                treeGroup.castShadow = true;
+                treeGroup.receiveShadow = true;
+                scene.add(treeGroup);
+                staticObstacles.push(treeGroup);
+            }
+            modelLoaded(); // Incrementar para fallback
+        }
+
         function loadPlaneta(radio, texturaURL) {
             const geometria = new THREE.SphereGeometry(radio, 128, 128);
             const textura = new THREE.TextureLoader().load(texturaURL);
@@ -525,43 +604,45 @@
                 staticObstacles.push(rock);
             }
 
-            // Árboles mejorados
-            const numTrees = 80; // Más árboles
-            for (let i = 0; i < numTrees; i++) {
-                const treeHeight = 2 + Math.random() * 3;
-                const trunkGeo = new THREE.CylinderGeometry(0.1, 0.2, treeHeight, 8);
-                const trunkMat = new THREE.MeshStandardMaterial({ 
-                    color: 0x8B4513,
-                    roughness: 0.8
+            // Load tree model instead of procedural
+            const treeLoader = new THREE.GLTFLoader();
+            treeLoader.load('models/tree.glb', function(gltf) {
+                const treeTemplate = gltf.scene.clone(); // Clone to avoid sharing
+                treeTemplate.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
                 });
-                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-                const leavesGeo = new THREE.SphereGeometry(1, 8, 8);
-                const leavesMat = new THREE.MeshStandardMaterial({ 
-                    color: 0x228B22,
-                    roughness: 0.7
-                });
-                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-                leaves.position.y = treeHeight / 2 + 0.5;
-                const treeGroup = new THREE.Group();
-                treeGroup.add(trunk);
-                treeGroup.add(leaves);
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                const pos = new THREE.Vector3(
-                    radio * Math.sin(phi) * Math.cos(theta),
-                    radio * Math.sin(phi) * Math.sin(theta),
-                    radio * Math.cos(phi)
-                );
-                treeGroup.position.copy(pos);
-                treeGroup.userData.originalPosition = pos.clone();
-                const radial = pos.clone().normalize();
-                const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
-                treeGroup.quaternion.copy(quat);
-                treeGroup.castShadow = true;
-                treeGroup.receiveShadow = true;
-                scene.add(treeGroup);
-                staticObstacles.push(treeGroup);
-            }
+                treeTemplate.scale.set(3, 3, 3); // Escala aumentada para árboles más grandes
+
+                const numTrees = 80;
+                for (let i = 0; i < numTrees; i++) {
+                    const tree = treeTemplate.clone();
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const pos = new THREE.Vector3(
+                        radio * Math.sin(phi) * Math.cos(theta),
+                        radio * Math.sin(phi) * Math.sin(theta),
+                        radio * Math.cos(phi)
+                    );
+                    tree.position.copy(pos);
+                    tree.userData.originalPosition = pos.clone();
+                    const radial = pos.clone().normalize();
+                    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+                    tree.quaternion.copy(quat);
+                    tree.castShadow = true;
+                    tree.receiveShadow = true;
+                    scene.add(tree);
+                    staticObstacles.push(tree);
+                }
+                console.log('Trees loaded from GLTF');
+                modelLoaded();
+            }, undefined, function(error) {
+                console.error('Error loading tree model:', error);
+                // Fallback to procedural
+                createProceduralTrees(radio);
+            });
 
             // Zonas de lava mejoradas con glow y partículas
             const numLava = 40; // Más zonas
@@ -640,30 +721,53 @@
         }
 
         // --- SPAWN DE ENEMIGOS VARIADOS ---
+        function preloadEnemyModels() {
+            const loader = new THREE.GLTFLoader();
+            ENEMY_TYPES.forEach(type => {
+                loader.load(type.model, function(gltf) {
+                    const model = gltf.scene.clone();
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            // Aplicar color tintado
+                            if (child.material) {
+                                child.material = child.material.clone();
+                                child.material.color.set(type.color);
+                                child.material.emissive = new THREE.Color(type.color);
+                                child.material.emissiveIntensity = 0.3;
+                            }
+                        }
+                    });
+                    enemyModels[type.name] = model;
+                    console.log(`Modelo de enemigo ${type.name} cargado`);
+                    modelLoaded();
+                }, undefined, function(error) {
+                    console.error(`Error cargando modelo ${type.model}:`, error);
+                    modelLoaded();
+                });
+            });
+        }
+
         function spawnEnemy() {
-            if (!gameRunning || Math.random() > ENEMY_SPAWN_RATE) return;
+            if (!gameRunning || !isInitialized || Math.random() > ENEMY_SPAWN_RATE) return;
+
+            const type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
+            const modelTemplate = enemyModels[type.name];
+            if (!modelTemplate) return; // Si no está cargado, saltar
+
+            const enemy = modelTemplate.clone(); // Clonar el modelo precargado
+            enemy.scale.set(type.scale, type.scale, type.scale); // Aplicar escala específica
 
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
+            const height = type.scale * 1.5; // Ajuste para mayor altura y visibilidad
             const pos = new THREE.Vector3(
-                currentPlanetRadius * Math.sin(phi) * Math.cos(theta),
-                currentPlanetRadius * Math.sin(phi) * Math.sin(theta),
-                currentPlanetRadius * Math.cos(phi)
+                (currentPlanetRadius + height) * Math.sin(phi) * Math.cos(theta),
+                (currentPlanetRadius + height) * Math.sin(phi) * Math.sin(theta),
+                (currentPlanetRadius + height) * Math.cos(phi)
             );
 
-            const type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
-            let geometry;
-            if (Array.isArray(type.size)) {
-                geometry = new type.shape(...type.size);
-            } else {
-                geometry = new type.shape(type.size, 8, 8);
-            }
-            const material = new THREE.MeshStandardMaterial({ 
-                color: type.color,
-                emissive: type.color,
-                emissiveIntensity: 0.3
-            });
-            const enemy = new THREE.Mesh(geometry, material);
             enemy.position.copy(pos);
             const radial = pos.clone().normalize();
             const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
@@ -673,18 +777,24 @@
                 speed: type.speed,
                 behavior: type.behavior,
                 type: type.name,
+                height: height,
                 isEnemy: true 
             };
-            enemy.castShadow = true;
-            enemy.receiveShadow = true;
+            enemy.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
             scene.add(enemy);
             enemies.push(enemy);
+            console.log(`Enemigo ${type.name} spawn en posición:`, pos);
         }
 
-        function loadPersonajeGLB(url, scale = 1.0) {
-            const loader = new THREE.GLTFLoader();
-            loader.load(url, function(gltf) {
-                personaje = gltf.scene;
+        function loadPersonaje(url, scale = 1.0) {
+            const loader = new THREE.FBXLoader();
+            loader.load(url, function(fbx) {
+                personaje = fbx;
                 personaje.scale.set(scale, scale, scale);
                 const initialPos = new THREE.Vector3(0, originalPlanetRadius + CHARACTER_HEIGHT, 0);
                 personaje.position.copy(initialPos);
@@ -724,35 +834,38 @@
                     emissive: 0x00aa00,
                     emissiveIntensity: 0.2
                 });
-                cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-                cube.position.copy(cubePos);
-                cube.castShadow = true;
-                cube.receiveShadow = true;
-                scene.add(cube);
-
-                console.log('Cube spawned in front of character.');
-
                 mixer = new THREE.AnimationMixer(personaje);
-                const animationClips = gltf.animations;
-                
-                for (let clip of animationClips) {
-                    const name = clip.name.toLowerCase();
-                    if (name.includes('idle')) {
-                        actions['Idle'] = mixer.clipAction(clip);
-                        actions['Idle'].setLoop(THREE.LoopRepeat, Infinity);
-                    }
-                    if (name.includes('walk') || name.includes('running')) {
-                        actions['Walk'] = mixer.clipAction(clip);
-                        actions['Walk'].setLoop(THREE.LoopRepeat, Infinity);
-                    }
-                }
-                
-                console.log('Animaciones encontradas:', Object.keys(actions));
-                if (actions['Idle']) setActiveAction(actions['Idle']);
+
+                // Cargar animaciones
+                loadAnimation('models/still.fbx', 'Idle');
+                loadAnimation('models/run.fbx', 'Walk');
 
                 console.log('✅ Personaje cargado correctamente.');
+                modelLoaded(); // Incrementar por el modelo del personaje
             }, undefined, function(error) {
                 console.error('❌ Error al cargar el modelo:', error);
+                modelLoaded(); // Incrementar incluso en error
+            });
+        }
+
+        function loadAnimation(file, name) {
+            const animLoader = new THREE.FBXLoader();
+            animLoader.load(file, function(animFbx) {
+                const clip = animFbx.animations[0]; // Asumir primer clip
+                if (clip) {
+                    actions[name] = mixer.clipAction(clip);
+                    if (name === 'Idle') {
+                        actions[name].setLoop(THREE.LoopRepeat, Infinity);
+                        setActiveAction(actions[name]);
+                    } else if (name === 'Walk') {
+                        actions[name].setLoop(THREE.LoopRepeat, Infinity);
+                    }
+                    console.log(`${name} animation loaded`);
+                }
+                modelLoaded(); // Incrementar por cada animación
+            }, undefined, function(error) {
+                console.error(`Error loading ${name} animation:`, error);
+                modelLoaded(); // Incrementar incluso en error
             });
         }
 
@@ -846,13 +959,12 @@
                 }
             }
 
-            // Update enemies positions (escalar hacia el centro)
+            // Update enemies positions (escalar hacia el centro, ajustando height)
             for (let enemy of enemies) {
-                enemy.position.multiplyScalar(scaleFactor);
-                // Actualizar radial para enemigos
-                if (enemy.userData.radial) {
-                    enemy.userData.radial = enemy.position.clone().normalize();
-                }
+                const scaledPos = enemy.position.clone().multiplyScalar(scaleFactor);
+                const adjustedPos = scaledPos.normalize().multiplyScalar(currentPlanetRadius + enemy.userData.height);
+                enemy.position.copy(adjustedPos);
+                enemy.userData.radial = adjustedPos.clone().normalize();
             }
 
             // Ajustar polvo atmosférico
@@ -898,7 +1010,7 @@
 
         // --- SPAWN DE METEORITOS CON TRAIL MEJORADO ---
         function spawnMeteor() {
-            if (!gameRunning || Math.random() > METEOR_SPAWN_RATE) return;
+            if (!isInitialized || !gameRunning || Math.random() > METEOR_SPAWN_RATE) return;
 
             const spawnRadius = currentPlanetRadius * 5; // Aumentado para spawns más lejanos, pero speed compensa
             const theta = Math.random() * Math.PI * 2;
@@ -943,7 +1055,7 @@
 
         // --- SPAWN DE POWER-UPS MEJORADO ---
         function spawnPowerUp() {
-            if (!gameRunning || Math.random() > POWERUP_SPAWN_RATE) return;
+            if (!isInitialized || !gameRunning || Math.random() > POWERUP_SPAWN_RATE) return;
 
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
@@ -1033,21 +1145,16 @@
                             direction.projectOnPlane(radial);
                         }
                         direction.normalize();
-                    } else if (enemy.userData.behavior === 'patrol') {
-                        // Para patrol, movimiento aleatorio o circular
-                        direction = new THREE.Vector3(Math.sin(gameTime + i * 10) * 0.5, Math.cos(gameTime + i * 10) * 0.5, 0).normalize();
-                        direction.projectOnPlane(radial);
                     }
 
-                    // Para jumper, agregar salto ocasional
-                    if (enemy.userData.behavior === 'jump') {
-                        if (Math.random() < 0.01) { // Salto ocasional
-                            direction.add(new THREE.Vector3(0, 5 * deltaTime, 0)); // Salto hacia arriba relativo
-                        }
+                    // Para jumper, agregar salto ocasional en dirección radial
+                    let jumpOffset = new THREE.Vector3(0, 0, 0);
+                    if (enemy.userData.behavior === 'jump' && Math.random() < 0.02) {
+                        jumpOffset = radial.clone().multiplyScalar(3.0); // Salto radial más visible
                     }
 
                     const moveVec = direction.clone().multiplyScalar(enemy.userData.speed * deltaTime);
-                    const newPos = enemyPos.clone().add(moveVec).normalize().multiplyScalar(currentPlanetRadius);
+                    const newPos = enemyPos.clone().add(moveVec).add(jumpOffset).normalize().multiplyScalar(currentPlanetRadius + enemy.userData.height);
 
                     enemy.position.copy(newPos);
                     const newRadial = newPos.clone().normalize();
@@ -1111,7 +1218,7 @@
         }
 
         function checkCollisions(deltaTime) {
-            if (!personaje || !gameRunning) return;
+            if (!personaje || !gameRunning || !isInitialized) return;
 
             const characterPos = personaje.position;
 
@@ -1207,7 +1314,7 @@
 
         function update() {
             const deltaTime = clock.getDelta();
-            if (gameRunning) {
+            if (gameRunning && isInitialized) {
                 gameTime += deltaTime;
                 score += SCORE_PER_SECOND * deltaTime;
 
@@ -1292,17 +1399,6 @@
                     }
                 }
             }
-
-            // Update cube
-            if (cube && personaje && gameRunning) {
-                const currentRadial = personaje.position.clone().normalize();
-                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(personaje.quaternion);
-                forward.projectOnPlane(currentRadial).normalize();
-                const distance = 20;
-                const radius = currentPlanetRadius + CHARACTER_HEIGHT;
-                const cubePos = currentRadial.clone().add(forward.clone().multiplyScalar(distance)).normalize().multiplyScalar(radius);
-                cube.position.copy(cubePos);
-            }
         }
 
         function updateCharacter(deltaTime) {
@@ -1327,7 +1423,7 @@
                 personaje.quaternion.premultiply(rotation);
             }
 
-            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(personaje.quaternion);
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(personaje.quaternion);
             forward.projectOnPlane(currentRadial).normalize();
 
             if (isMoving) {
