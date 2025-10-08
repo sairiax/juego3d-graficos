@@ -296,7 +296,7 @@
         const METEOR_RADIUS = 1;
         const EXPLOSION_RADIUS = 5;
         const EXPLOSION_DURATION = 1;
-        const COLLISION_DISTANCE = 2.0; // Aumentado para colisiones más fáciles con meteoritos
+        const COLLISION_DISTANCE = 2.5; // Aumentado para colisiones más fáciles con meteoritos y enemigos
         let POWERUP_SPAWN_RATE = 0.001;
         const POWERUP_RADIUS = 0.5;
         const SCORE_PER_SECOND = 10;
@@ -307,7 +307,7 @@
         let lastSecond = 0;
 
         // Configuración de enemigos variados
-        let ENEMY_SPAWN_RATE = 0.003; // Tasa inicial de spawn de enemigos
+        let ENEMY_SPAWN_RATE = 0.01; // Aumentado para test (más enemigos)
         const ENEMY_SPEED = 1.5; // Velocidad base
         const ENEMY_RADIUS = 0.8;
         const ENEMY_TYPES = [
@@ -511,48 +511,6 @@
             setInterval(updateUI, 100);
         }
 
-        function createProceduralTrees(radio) {
-            // Fallback procedural trees
-            const numTrees = 80;
-            for (let i = 0; i < numTrees; i++) {
-                const treeHeight = 2 + Math.random() * 3;
-                const trunkGeo = new THREE.CylinderGeometry(0.1, 0.2, treeHeight, 8);
-                const trunkMat = new THREE.MeshStandardMaterial({ 
-                    color: 0x8B4513,
-                    roughness: 0.8
-                });
-                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-                const leavesGeo = new THREE.SphereGeometry(1, 8, 8);
-                const leavesMat = new THREE.MeshStandardMaterial({ 
-                    color: 0x228B22,
-                    roughness: 0.7
-                });
-                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-                leaves.position.y = treeHeight / 2 + 0.5;
-                const treeGroup = new THREE.Group();
-                treeGroup.add(trunk);
-                treeGroup.add(leaves);
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                const pos = new THREE.Vector3(
-                    radio * Math.sin(phi) * Math.cos(theta),
-                    radio * Math.sin(phi) * Math.sin(theta),
-                    radio * Math.cos(phi)
-                );
-                treeGroup.position.copy(pos);
-                treeGroup.userData.originalPosition = pos.clone();
-                const radial = pos.clone().normalize();
-                const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
-                treeGroup.quaternion.copy(quat);
-                treeGroup.scale.set(3, 3, 3); // Escala aumentada para árboles más grandes
-                treeGroup.castShadow = true;
-                treeGroup.receiveShadow = true;
-                scene.add(treeGroup);
-                staticObstacles.push(treeGroup);
-            }
-            modelLoaded(); // Incrementar para fallback
-        }
-
         function loadPlaneta(radio, texturaURL) {
             const geometria = new THREE.SphereGeometry(radio, 128, 128);
             const textura = new THREE.TextureLoader().load(texturaURL);
@@ -614,11 +572,17 @@
                         child.receiveShadow = true;
                     }
                 });
-                treeTemplate.scale.set(3, 3, 3); // Escala aumentada para árboles más grandes
+                treeTemplate.scale.set(3, 3, 3); // Escala razonable para GLTF (ajusta según el tamaño de tu modelo; prueba 0.1-2.0)
 
-                const numTrees = 80;
+                const numTrees = 100; // Reducido para mejor rendimiento con escalas grandes
                 for (let i = 0; i < numTrees; i++) {
                     const tree = treeTemplate.clone();
+                    tree.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
                     const theta = Math.random() * Math.PI * 2;
                     const phi = Math.acos(2 * Math.random() - 1);
                     const pos = new THREE.Vector3(
@@ -627,12 +591,19 @@
                         radio * Math.cos(phi)
                     );
                     tree.position.copy(pos);
-                    tree.userData.originalPosition = pos.clone();
                     const radial = pos.clone().normalize();
                     const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
                     tree.quaternion.copy(quat);
                     tree.castShadow = true;
                     tree.receiveShadow = true;
+                    // Offset para evitar que se entierren
+                    const treeOffset = tree.scale.y + 1.0;
+                    tree.position.add(radial.clone().multiplyScalar(treeOffset));
+                    tree.userData = {
+                        isTree: true,
+                        radial: radial.clone(),
+                        offset: treeOffset
+                    };
                     scene.add(tree);
                     staticObstacles.push(tree);
                 }
@@ -640,12 +611,11 @@
                 modelLoaded();
             }, undefined, function(error) {
                 console.error('Error loading tree model:', error);
-                // Fallback to procedural
-                createProceduralTrees(radio);
+                createProceduralTrees(radio); // Fallback a procedural si GLTF falla
             });
 
             // Zonas de lava mejoradas con glow y partículas
-            const numLava = 40; // Más zonas
+            const numLava = 400; // Más zonas
             for (let i = 0; i < numLava; i++) {
                 const lavaRadius = 1.0; // Aumentado para más cobertura
                 const lavaGeo = new THREE.SphereGeometry(lavaRadius, 16, 16);
@@ -685,6 +655,49 @@
                 scene.add(smoke);
                 lava.userData.smoke = smoke;
             }
+        }
+
+        function createProceduralTrees(radio) {
+            // Fallback procedural trees
+            const numTrees = 100;
+            for (let i = 0; i < numTrees; i++) {
+                const treeHeight = 3 + Math.random() * 2;
+                const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                const foliageGeo = new THREE.SphereGeometry(1.5, 8, 8);
+                const foliageMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+                foliage.position.y = 1.5;
+                const tree = new THREE.Group();
+                tree.add(trunk);
+                tree.add(foliage);
+                tree.scale.set(1, treeHeight / 3, 1);
+
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const pos = new THREE.Vector3(
+                    radio * Math.sin(phi) * Math.cos(theta),
+                    radio * Math.sin(phi) * Math.sin(theta),
+                    radio * Math.cos(phi)
+                );
+                tree.position.copy(pos);
+                const radial = pos.clone().normalize();
+                const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+                tree.quaternion.copy(quat);
+                const treeOffset = treeHeight + 1.0;
+                tree.position.add(radial.clone().multiplyScalar(treeOffset));
+                tree.userData = {
+                    isTree: true,
+                    radial: radial.clone(),
+                    offset: treeOffset
+                };
+                tree.castShadow = true;
+                tree.receiveShadow = true;
+                scene.add(tree);
+                staticObstacles.push(tree);
+            }
+            modelLoaded();
         }
 
         function spawnLava(position) {
@@ -744,6 +757,22 @@
                     modelLoaded();
                 }, undefined, function(error) {
                     console.error(`Error cargando modelo ${type.model}:`, error);
+                    // Fallback: Crear geometría procedural simple
+                    const fallbackGeometry = type.name === 'chaser' ? 
+                        new THREE.SphereGeometry(0.5, 8, 8) :  // Esfera para chaser
+                        (type.name === 'brute' ? 
+                            new THREE.CylinderGeometry(0.6, 0.8, 1.2, 8) :  // Cilindro ancho para brute
+                            new THREE.ConeGeometry(0.4, 1.5, 8)  // Cono para jumper
+                        );
+                    const fallbackMaterial = new THREE.MeshStandardMaterial({ 
+                        color: type.color,
+                        emissive: type.color,
+                        emissiveIntensity: 0.5  // Glow fuerte para visibilidad
+                    });
+                    const fallbackModel = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+                    fallbackModel.userData = { fallback: true };  // Marcar como fallback
+                    enemyModels[type.name] = fallbackModel;
+                    console.log(`Fallback procedural creado para enemigo ${type.name}`);
                     modelLoaded();
                 });
             });
@@ -754,18 +783,41 @@
 
             const type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
             const modelTemplate = enemyModels[type.name];
-            if (!modelTemplate) return; // Si no está cargado, saltar
+            if (!modelTemplate) return;
 
-            const enemy = modelTemplate.clone(); // Clonar el modelo precargado
-            enemy.scale.set(type.scale, type.scale, type.scale); // Aplicar escala específica
+            // TEST: Reemplaza con geometría simple para visibilidad (cambia true a false para usar modelo real)
+            let enemy;
+            if (true) {  // Cambia a false para usar modelo real
+                // Geometría fallback: esfera roja brillante para chaser, cilindro marrón para brute, cono magenta para jumper
+                const geo = type.name === 'chaser' ? new THREE.SphereGeometry(0.8, 8, 8) :
+                            type.name === 'brute' ? new THREE.CylinderGeometry(0.6, 1.0, 1.5, 8) :
+                            new THREE.ConeGeometry(0.5, 2.0, 8);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: type.color,
+                    emissive: type.color,
+                    emissiveIntensity: 1.0,  // Muy brillante para test
+                    transparent: true,
+                    opacity: 0.9
+                });
+                enemy = new THREE.Mesh(geo, mat);
+                enemy.userData.fallback = true;  // Marca para animación extra
+                console.log(`Usando fallback para ${type.name}`);
+            } else {
+                enemy = modelTemplate.clone();
+            }
+
+            enemy.scale.set(type.scale, type.scale, type.scale);
 
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
-            const height = type.scale * 1.5; // Ajuste para mayor altura y visibilidad
+            // Reducir altura para que estén al nivel del jugador
+            const height = CHARACTER_HEIGHT; // 0.5, igual que el jugador
+            // Spawn más cerca para test: radio * 1.2
+            const spawnRadius = currentPlanetRadius * 1.2 + height;
             const pos = new THREE.Vector3(
-                (currentPlanetRadius + height) * Math.sin(phi) * Math.cos(theta),
-                (currentPlanetRadius + height) * Math.sin(phi) * Math.sin(theta),
-                (currentPlanetRadius + height) * Math.cos(phi)
+                spawnRadius * Math.sin(phi) * Math.cos(theta),
+                spawnRadius * Math.sin(phi) * Math.sin(theta),
+                spawnRadius * Math.cos(phi)
             );
 
             enemy.position.copy(pos);
@@ -774,20 +826,40 @@
             enemy.quaternion.copy(quat);
             enemy.userData = { 
                 radial: radial.clone(), 
-                speed: type.speed,
+                speed: type.speed * 2,  // DUPLICA velocidad para test
                 behavior: type.behavior,
                 type: type.name,
-                height: height,
-                isEnemy: true 
+                height: height, // Usar la altura baja
+                isEnemy: true,
+                rotationSpeed: Math.random() * 0.5 + 0.5
             };
+            
+            // Asegura visibilidad: glow y sombras
             enemy.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+                    if (child.material) {
+                        child.material.emissiveIntensity = 0.8;  // Aumenta glow
+                    }
                 }
             });
+
             scene.add(enemy);
             enemies.push(enemy);
+
+            // Agregar trail naranja para visibilidad
+            const trailPoints = [enemy.position.clone()];
+            for (let j = 1; j < 5; j++) {
+                const backPos = enemy.position.clone().sub(radial.clone().multiplyScalar(j * 1));
+                trailPoints.push(backPos);
+            }
+            const trailGeometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
+            const trailMaterial = new THREE.LineBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.6 });
+            const trail = new THREE.Line(trailGeometry, trailMaterial);
+            scene.add(trail);
+            enemy.userData.trail = trail;
+
             console.log(`Enemigo ${type.name} spawn en posición:`, pos);
         }
 
@@ -934,8 +1006,17 @@
 
             // Update static obstacles positions
             for (let obj of staticObstacles) {
-                if (obj.userData && obj.userData.originalPosition) {
-                    const newPos = obj.userData.originalPosition.clone().multiplyScalar(currentPlanetRadius / originalPlanetRadius);
+                if (obj.userData) {
+                    let newPos;
+                    if (obj.userData.isTree) {
+                        // Para árboles: nueva posición = radial * (currentRadius + offset)
+                        newPos = obj.userData.radial.clone().multiplyScalar(currentPlanetRadius + obj.userData.offset);
+                    } else if (obj.userData.originalPosition) {
+                        // Para rocas: escalar posición original
+                        newPos = obj.userData.originalPosition.clone().multiplyScalar(currentPlanetRadius / originalPlanetRadius);
+                    } else {
+                        continue;
+                    }
                     obj.position.copy(newPos);
                 }
             }
@@ -1166,6 +1247,24 @@
 
                     // Rotación para variedad
                     enemy.rotation.y += deltaTime * (1 + Math.random());
+
+                    // Animación extra para fallback o todos
+                    if (enemy.userData.fallback || true) {
+                        enemy.rotation.x += deltaTime * enemy.userData.rotationSpeed * 0.5;
+                        enemy.rotation.z += Math.sin(gameTime * 2 + i) * deltaTime * 0.2;  // Bobbing para "vida"
+                        // Actualiza trail si existe
+                        if (enemy.userData.trail) {
+                            const points = enemy.userData.trail.geometry.attributes.position.array;
+                            points[0] = enemy.position.x; points[1] = enemy.position.y; points[2] = enemy.position.z;
+                            for (let j = 1; j < points.length / 3; j++) {
+                                const dist = j * 1;
+                                points[j*3] = enemy.position.x - radial.x * dist;
+                                points[j*3+1] = enemy.position.y - radial.y * dist;
+                                points[j*3+2] = enemy.position.z - radial.z * dist;
+                            }
+                            enemy.userData.trail.geometry.attributes.position.needsUpdate = true;
+                        }
+                    }
                 }
             }
         }
@@ -1267,6 +1366,7 @@
                 if (dist < COLLISION_DISTANCE && !invulnerable) {
                     takeHit();
                     score += SCORE_PER_ENEMY; // Puntos por destruir enemigo
+                    if (enemy.userData.trail) scene.remove(enemy.userData.trail);
                     scene.remove(enemy);
                     enemies.splice(i, 1);
                 }
