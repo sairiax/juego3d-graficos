@@ -3,165 +3,241 @@
 <head>
     <title>Personaje en Planeta con Three.js - Juego de Supervivencia</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body { 
-            margin: 0; 
-            font-family: 'Arial', sans-serif; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #000; 
             overflow: hidden;
+            color: #fff;
         }
+        
         #container { 
             width: 100%; 
             height: 100vh; 
             position: relative; 
         }
+        
+        /* UI Panel */
         #ui {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 15px;
+            left: 15px;
             color: white;
             z-index: 100;
-            background: rgba(0,0,0,0.8);
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid #00ff00;
-            box-shadow: 0 0 15px rgba(0,255,0,0.6);
+            background: rgba(0, 10, 20, 0.85);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid rgba(0, 255, 100, 0.6);
+            box-shadow: 0 0 25px rgba(0, 255, 100, 0.4), inset 0 0 15px rgba(0, 255, 100, 0.1);
             font-size: 14px;
-            min-width: 180px;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
         }
+        
+        #ui > div {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
         #healthBar {
-            width: 150px;
-            height: 20px;
-            background: rgba(0,0,0,0.5);
-            border-radius: 10px;
+            width: 180px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 12px;
             overflow: hidden;
-            margin-top: 10px;
+            margin-top: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
         }
+        
         #healthFill {
             height: 100%;
-            background: linear-gradient(to right, #00ff00, #ff0000);
+            background: linear-gradient(90deg, #00ff00, #88ff00, #ffff00, #ff8800, #ff0000);
             width: 100%;
-            transition: width 0.3s ease;
+            transition: width 0.3s ease, filter 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.6);
         }
+        
         #time, #hits, #score, #planetRadius {
             font-weight: bold;
-            text-shadow: 0 0 5px #00ff00;
+            text-shadow: 0 0 8px currentColor;
+            color: #00ff88;
         }
+        
+        #invulnIndicator, #lavaWarning {
+            font-size: 13px;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 6px;
+            margin-top: 8px;
+            animation: pulse 0.8s infinite;
+        }
+        
         #invulnIndicator {
             color: #00ffff;
-            font-size: 12px;
-            text-shadow: 0 0 5px #00ffff;
+            background: rgba(0, 255, 255, 0.2);
+            border: 1px solid #00ffff;
             display: none;
         }
+        
         #lavaWarning {
             color: #ff4500;
-            font-size: 12px;
-            text-shadow: 0 0 5px #ff4500;
+            background: rgba(255, 69, 0, 0.2);
+            border: 1px solid #ff4500;
             display: none;
         }
-        #shrinkCooldown {
-            color: #ffff00;
-            font-size: 12px;
-            text-shadow: 0 0 5px #ffff00;
-            display: none;
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
         }
+        
+        /* Game Over / Win Screens */
+        #gameOver, #winScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px 50px;
+            border-radius: 20px;
+            border: 3px solid;
+            box-shadow: 0 0 40px;
+            display: none;
+            font-size: 18px;
+            backdrop-filter: blur(10px);
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translate(-50%, -60%); opacity: 0; }
+            to { transform: translate(-50%, -50%); opacity: 1; }
+        }
+        
         #gameOver {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            text-align: center;
-            z-index: 200;
-            background: rgba(0,0,0,0.9);
-            padding: 30px;
-            border-radius: 15px;
-            border: 2px solid #ff0000;
-            box-shadow: 0 0 20px rgba(255,0,0,0.6);
-            display: none;
-            font-size: 18px;
+            border-color: #ff0000;
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.6);
         }
+        
         #winScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            text-align: center;
-            z-index: 200;
-            background: rgba(0,0,0,0.9);
-            padding: 30px;
-            border-radius: 15px;
-            border: 2px solid #00ff00;
-            box-shadow: 0 0 20px rgba(0,255,0,0.6);
-            display: none;
-            font-size: 18px;
+            border-color: #00ff00;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.6);
         }
+        
         #winScreen h2 {
             color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
+            text-shadow: 0 0 15px #00ff00;
+            font-size: 48px;
+            margin-bottom: 20px;
         }
+        
         #gameOver h2 {
             color: #ff0000;
-            text-shadow: 0 0 10px #ff0000;
+            text-shadow: 0 0 15px #ff0000;
+            font-size: 48px;
+            margin-bottom: 20px;
         }
+        
         #restartBtn {
-            background: #00ff00;
-            color: black;
+            background: linear-gradient(135deg, #00ff00, #00cc00);
+            color: #000;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 12px 30px;
+            border-radius: 8px;
             font-weight: bold;
+            font-size: 16px;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 255, 0, 0.4);
         }
+        
         #restartBtn:hover {
-            background: #00cc00;
+            background: linear-gradient(135deg, #00cc00, #009900);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 255, 0, 0.6);
         }
+        
+        #restartBtn:active {
+            transform: translateY(0);
+        }
+        
+        /* Instructions Panel */
         #instructions {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
+            bottom: 15px;
+            left: 15px;
             color: white;
             z-index: 100;
-            background: rgba(0,0,0,0.8);
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid #ffff00;
-            box-shadow: 0 0 15px rgba(255,255,0,0.6);
-            font-size: 14px;
-            max-width: 300px;
+            background: rgba(0, 10, 20, 0.85);
+            padding: 18px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 0, 0.6);
+            box-shadow: 0 0 25px rgba(255, 255, 0, 0.4);
+            font-size: 13px;
+            max-width: 320px;
+            backdrop-filter: blur(10px);
         }
+        
+        #instructions strong {
+            color: #ffff00;
+            font-size: 15px;
+        }
+        
+        /* Tips Panel */
+        #tips {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            color: white;
+            z-index: 100;
+            background: rgba(0, 10, 20, 0.85);
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 0, 255, 0.6);
+            box-shadow: 0 0 25px rgba(255, 0, 255, 0.4);
+            font-size: 12px;
+            max-width: 220px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #tips strong {
+            color: #ff00ff;
+            font-size: 14px;
+        }
+        
+        /* Minimap */
         #minimap {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 150px;
-            height: 150px;
-            background: rgba(0,0,0,0.8);
+            top: 15px;
+            right: 15px;
+            width: 160px;
+            height: 160px;
+            background: rgba(0, 10, 20, 0.85);
             border-radius: 50%;
-            border: 2px solid #00ffff;
+            border: 3px solid rgba(0, 255, 255, 0.6);
             overflow: hidden;
-            box-shadow: 0 0 15px rgba(0,255,255,0.5);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
         }
+        
         #minimap canvas {
             display: block;
             width: 100%;
             height: 100%;
         }
-        #tips {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            color: white;
-            z-index: 100;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            border-radius: 10px;
-            border: 2px solid #ff00ff;
-            box-shadow: 0 0 15px rgba(255,0,255,0.5);
-            font-size: 12px;
-            max-width: 200px;
-        }
+        
+        /* Loading Screen */
         #loading {
             position: absolute;
             top: 50%;
@@ -170,60 +246,109 @@
             color: white;
             text-align: center;
             z-index: 200;
-            background: rgba(0,0,0,0.9);
-            padding: 30px;
-            border-radius: 15px;
-            display: block;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px 60px;
+            border-radius: 20px;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+        }
+        
+        #loading h2 {
+            color: #00ffff;
+            text-shadow: 0 0 15px #00ffff;
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 255, 255, 0.3);
+            border-top: 4px solid #00ffff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Score popup animation */
+        .score-popup {
+            position: absolute;
+            color: #ffff00;
+            font-weight: bold;
+            font-size: 20px;
+            text-shadow: 0 0 10px #ffff00;
+            pointer-events: none;
+            animation: scoreFloat 1s ease-out forwards;
+        }
+        
+        @keyframes scoreFloat {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
         }
     </style>
 </head>
 <body>
     <div id="container">
         <div id="ui">
-            <div>Tiempo: <span id="time">0</span>s</div>
-            <div>Puntuacion: <span id="score">0</span></div>
-            <div>Golpes: <span id="hits">0</span>/3</div>
+            <div><span>Tiempo:</span> <span id="time">0</span>s</div>
+            <div><span>Puntuación:</span> <span id="score">0</span></div>
+            <div><span>Golpes:</span> <span id="hits">0</span>/3</div>
             <div id="healthBar">
                 <div id="healthFill"></div>
             </div>
-            <div>Radio Planeta: <span id="planetRadius">40</span></div>
-            <div id="invulnIndicator">¡Invulnerable!</div>
-            <div id="lavaWarning">¡En Lava! Daño continuo...</div>
-            <div id="shrinkCooldown">¡Espera 10s para encoger de nuevo!</div>
+            <div><span>Radio Planeta:</span> <span id="planetRadius">40</span></div>
+            <div id="invulnIndicator">⚡ ¡INVULNERABLE!</div>
+            <div id="lavaWarning">🔥 ¡EN LAVA! Daño continuo...</div>
         </div>
+        
         <div id="instructions">
-            <strong>Controles:</strong><br>
-            W/Flecha ↑: Mover adelante<br>
+            <strong>🎮 Controles:</strong><br>
+            W/↑: Mover adelante<br>
             A/D o ←/→: Girar<br>
-            S/Flecha ↓: Revertir direccion<br>
-            <strong>Espacio: Encoger planeta (cada 10s)</strong><br>
-            <br>Sobrevive evitando meteoritos. ¡Colecciona power-ups para curarte y ganar puntos extra!<br>
-            <small>¡Encoge el planeta hasta radio 5 para ganar! Evita las zonas de lava rojas brillantes y los enemigos variados que te persiguen.</small>
+            S/↓: Revertir dirección<br><br>
+            <strong>🎯 Objetivo:</strong><br>
+            Sobrevive mientras el planeta se encoge cada 10s!<br>
+            Colecciona power-ups para curarte.<br>
+            Evita meteoritos, lava y enemigos.<br>
+            <small>¡Gana sobreviviendo hasta radio 5!</small>
         </div>
+        
         <div id="tips">
-            <strong>Consejos:</strong><br>
-            - Meteoritos dejan rastro naranja.<br>
-            - Explosiones dañan en área.<br>
-            - Power-ups azules curan.<br>
-            - Lava daña cada segundo.<br>
-            - ¡Enemigos rojos te siguen! Destrúyelos al chocar para puntos. Hay tipos rápidos, grandes y saltadores.
+            <strong>💡 Consejos:</strong><br>
+            • Meteoritos dejan rastro naranja<br>
+            • Explosiones dañan en área<br>
+            • Power-ups azules curan<br>
+            • Lava daña periódicamente<br>
+            • ¡Enemigos rojos salen de lava!<br>
+            • Destruye enemigos por puntos extra
         </div>
+        
         <div id="minimap"></div>
+        
         <div id="gameOver">
-            <h2>¡Game Over!</h2>
+            <h2>💀 ¡GAME OVER!</h2>
             <p>Tiempo sobrevivido: <span id="finalTime">0</span>s</p>
-            <p>Puntuacion final: <span id="finalScore">0</span></p>
-            <p>Mejor puntuacion: <span id="bestScore">0</span></p>
-            <button id="restartBtn" onclick="location.reload()">Reiniciar</button>
+            <p>Puntuación final: <span id="finalScore">0</span></p>
+            <p>Mejor puntuación: <span id="bestScore">0</span></p>
+            <button id="restartBtn" onclick="location.reload()">🔄 Reiniciar</button>
         </div>
+        
         <div id="winScreen">
-            <h2>¡Victoria!</h2>
+            <h2>🏆 ¡VICTORIA!</h2>
             <p>Tiempo: <span id="winTime">0</span>s</p>
-            <p>Puntuacion: <span id="winScore">0</span></p>
-            <button id="restartBtn" onclick="location.reload()">Jugar de nuevo</button>
+            <p>Puntuación: <span id="winScore">0</span></p>
+            <button id="restartBtn" onclick="location.reload()">🎮 Jugar de nuevo</button>
         </div>
+        
         <div id="loading">
-            <h2>Cargando modelos...</h2>
+            <h2>🌍 Cargando planeta...</h2>
+            <div class="spinner"></div>
             <p>Por favor espera.</p>
         </div>
     </div>
@@ -234,8 +359,80 @@
     <script src="js/inflate.min.js"></script>
 
     <script>
+        // Glitch shaders - more obvious for enemies
+        const glitchVertexShader = `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            uniform float time;
+            float hash(vec3 p3) {
+                p3  = fract(p3 * 0.3183099 + 0.1);
+                return fract(sin(dot(p3, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+            }
+            void main() {
+                vUv = uv;
+                vPosition = position;
+                vec3 pos = position;
+                vec3 p = pos + time * 1.0; // Faster change
+                float h = hash(p);
+                pos.xyz += (h * 2.0 - 1.0) * 0.3; // Stronger displacement
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `;
+
+        const glitchFragmentShader = `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            uniform float time;
+            uniform vec3 baseColor;
+            float hash(vec3 p3) {
+                p3  = fract(p3 * 0.3183099 + 0.1);
+                return fract(sin(dot(p3, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+            }
+            void main() {
+                vec3 col = baseColor;
+                vec3 p = vPosition + time * 0.6; // Faster
+                float h = hash(p * 0.1);
+                col.rgb += (h - 0.5) * 1.0; // Stronger color shift
+                float lineh = fract(sin(dot(vPosition.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                if (lineh > 0.95) {
+                    col += vec3(0.0, 1.0, 0.0) * 0.8; // Stronger scanlines
+                }
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `;
+
+        // Different glitch for lava - more fiery
+        const lavaVertexShader = `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            uniform float time;
+            void main() {
+                vUv = uv;
+                vPosition = position;
+                vec3 pos = position;
+                pos.y += sin(time * 2.0 + pos.x * 5.0) * 0.1; // Wavy displacement
+                pos.x += cos(time * 3.0 + pos.z * 3.0) * 0.05;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `;
+
+        const lavaFragmentShader = `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            uniform float time;
+            uniform vec3 baseColor;
+            void main() {
+                vec3 col = baseColor;
+                col.r += sin(time * 4.0 + vUv.x * 10.0) * 0.3; // Red flicker
+                col.g += cos(time * 3.0 + vUv.y * 8.0) * 0.2; // Orange wave
+                col.b += sin(time * 5.0) * 0.1; // Slight blue for heat
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `;
+
         // --- REFERENCIAS GLOBALES ---
         var renderer, scene, camera, planeta, previousRadial, cube;
+        let sunLight;
         var clock = new THREE.Clock();
 
         // --- GESTIÓN DE ANIMACIÓN ---
@@ -257,31 +454,37 @@
         let enemies = []; // Nuevo: enemigos que persiguen al jugador
         let bestScore = localStorage.getItem('bestScore') || 0;
 
-        // Cooldown para encoger
-        let lastShrinkTime = 0;
-        const SHRINK_COOLDOWN = 10; // 10 segundos
+        // Auto shrink
+        let lastAutoShrinkTime = 0;
+        const AUTO_SHRINK_INTERVAL = 10;
 
         // Invulnerabilidad
         let invulnerable = false;
         let invulnTimer = 0;
-        const INVULN_DURATION = 4;
+        const INVULN_DURATION = 3; // Reducido a 3s para más dificultad
 
         // Daño de lava
         let inLava = false;
         let lavaDamageTimer = 0;
-        const LAVA_DAMAGE_INTERVAL = 0.5; // Reducido para daño más frecuente
+        const LAVA_DAMAGE_INTERVAL = 0.3; // Reducido a 0.3s para daño más frecuente
 
         // Seguimiento de carga de modelos
-        const modelsToLoad = 7; // player model + 2 anims + 3 enemies + tree
+        const modelsToLoad = 8; // player model + 2 anims + 3 enemies + tree + meteor/lava
         let modelsLoaded = 0;
         let isInitialized = false;
+
+        // Meteor/Lava model template
+        let meteorLavaTemplate;
+
+        // Player initial position
+        const playerInitialPos = new THREE.Vector3(0, 40 + 0.5, 0);
 
         // --- CONSTANTES DE CONFIGURACIÓN ---
         const originalPlanetRadius = 40;
         let currentPlanetRadius = originalPlanetRadius;
         const CHARACTER_HEIGHT = 0.5;
         const CHARACTER_SCALE = 0.02;
-        const FORWARD_SPEED = 10.0;
+        const FORWARD_SPEED = 8.0; // Reducido de 10 a 8 para más dificultad
         const TURN_SPEED = 2.0;
         const CAMERA_DISTANCE = 1000;
         const CAMERA_HEIGHT = 700;
@@ -292,29 +495,29 @@
         const BLAST_DAMAGE_RADIUS = 3.0;
 
         // --- CONFIGURACIÓN DE OBSTÁCULOS MEJORADA ---
-        let METEOR_SPAWN_RATE = 0.01; // Aumentado para más dificultad inicial
-        const METEOR_SPEED = 30; // Aumentado para que lleguen más rápido y alcancen
+        let METEOR_SPAWN_RATE = 0.015; // Aumentado inicial para más meteoritos
+        const METEOR_SPEED = 35; // Aumentado de 30 a 35
         const METEOR_RADIUS = 1;
         const EXPLOSION_RADIUS = 5;
         const EXPLOSION_DURATION = 1;
-        const COLLISION_DISTANCE = 2.5; // Aumentado para colisiones más fáciles con meteoritos y enemigos
-        let POWERUP_SPAWN_RATE = 0.001;
+        const COLLISION_DISTANCE = 2.0; // Reducido de 2.5 para colisiones más fáciles (más difícil)
+        let POWERUP_SPAWN_RATE = 0.0005; // Reducido para menos powerups
         const POWERUP_RADIUS = 0.5;
         const SCORE_PER_SECOND = 10;
         const SCORE_PER_POWERUP = 100;
         const SCORE_PER_ENEMY = 50; // Puntos por destruir enemigo
-        const DIFFICULTY_INCREASE_INTERVAL = 10;
+        const DIFFICULTY_INCREASE_INTERVAL = 8; // Reducido de 10 a 8 para aumento más rápido
         let lastDifficultyIncrease = 0;
         let lastSecond = 0;
 
-        // Configuración de enemigos variados
-        let ENEMY_SPAWN_RATE = 0.01; // Aumentado para test (más enemigos)
-        const ENEMY_SPEED = 1.5; // Velocidad base
+        // Configuración de enemigos variados (velocidad aumentada para dificultad)
+        let ENEMY_SPAWN_RATE = 0.008; // Ligeramente reducido para no añadir más, pero velocidad interna aumentada
+        const ENEMY_SPEED = 2.0; // Aumentado de 1.5 a 2.0
         const ENEMY_RADIUS = 0.8;
         const ENEMY_TYPES = [
-            { name: 'chaser', model: 'models/e1.glb', scale: 2.0, color: 0xff0000, speed: 1.5, behavior: 'chase' },
-            { name: 'brute', model: 'models/e2.glb', scale: 1.5, color: 0x800000, speed: 0.8, behavior: 'chase' },
-            { name: 'jumper', model: 'models/e3.glb', scale: 1.8, color: 0xff00ff, speed: 1.2, behavior: 'jump' }
+            { name: 'chaser', model: 'models/e1.glb', scale: 1.0, color: 0xff00ff, speed: 2.0, behavior: 'chase' },
+            { name: 'brute', model: 'models/e2.glb', scale: 0.8, color: 0xff00ff, speed: 1.2, behavior: 'chase' },
+            { name: 'jumper', model: 'models/e3.glb', scale: 1.2, color: 0xff00ff, speed: 1.6, behavior: 'jump' }
         ];
         
         // Cache de modelos de enemigos
@@ -324,25 +527,23 @@
         let minimapRenderer, minimapCamera;
         let minimapAngle = 0;
 
+        // Textura de piedra (cargada globalmente)
+        let stoneTexture;
+
         // --- ESTADO DEL TECLADO ---
         var keysPressed = {};
         document.addEventListener('keydown', (event) => {
             keysPressed[event.key.toLowerCase()] = true;
-            if (event.key.toLowerCase() === ' ') {
-                event.preventDefault();
-                if (gameRunning && isInitialized) {
-                    attemptShrinkPlanet();
-                }
-            }
         }, false);
         document.addEventListener('keyup', (event) => keysPressed[event.key.toLowerCase()] = false, false);
 
         let personaje;
 
         init();
-        loadPlaneta(originalPlanetRadius, 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg');
+        loadPlaneta(originalPlanetRadius, 'images/planet.png');
         loadPersonaje('models/c.fbx', CHARACTER_SCALE);
         preloadEnemyModels();
+        loadMeteorLavaModel();
         render();
 
         function modelLoaded() {
@@ -361,7 +562,7 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.0;
+            renderer.toneMappingExposure = 1.2; // Reducido para menos sobreexposición
             document.getElementById('container').appendChild(renderer.domElement);
 
             // Minimap setup mejorado
@@ -418,14 +619,14 @@
             const stars = new THREE.Points(starGeometry, starMaterial);
             scene.add(stars);
             
-            // Iluminación mejorada para más belleza
-            scene.add(new THREE.AmbientLight(0x404040, 0.4)); // Reducido para contraste
+            // Iluminación ajustada para menos blanco, más cálida y equilibrada
+            scene.add(new THREE.AmbientLight(0x404040, 0.6)); // Aumentado ligeramente para más luz ambiental sin lavar
             
-            const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x444444, 0.8); // Cielo azul
+            const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x444444, 1.0); // Cielo azul, suelo gris, intensidad aumentada un poco
             hemiLight.position.set(0, 200, 0);
             scene.add(hemiLight);
             
-            const sunLight = new THREE.DirectionalLight(0xffddaa, 1.5); // Intensidad reducida
+            sunLight = new THREE.DirectionalLight(0xffddaa, 2.0); // Color cálido, intensidad media-alta
             sunLight.position.set(200, 150, 100);
             sunLight.castShadow = true;
             sunLight.shadow.mapSize.width = 4096;
@@ -440,10 +641,16 @@
             sunLight.shadow.normalBias = 0.0005;
             scene.add(sunLight);
 
-            // Sol visible con glow mejorado
+            // Luz de relleno suave para evitar sombras duras, sin blanco puro
+            const fillLight = new THREE.DirectionalLight(0xddddff, 0.8); // Tono azulado suave
+            fillLight.position.set(-200, -150, -100);
+            fillLight.castShadow = false;
+            scene.add(fillLight);
+
+            // Sol visible con glow ajustado
             const sunGeometry = new THREE.SphereGeometry(8, 64, 64);
             const sunMaterial = new THREE.MeshBasicMaterial({ 
-                color: 0xffff88,
+                color: 0xffddaa,
                 transparent: true,
                 opacity: 0.95
             });
@@ -455,7 +662,7 @@
             const glowMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xffaa00, 
                 transparent: true, 
-                opacity: 0.5,
+                opacity: 0.4,
                 side: THREE.BackSide 
             });
             const glow = new THREE.Mesh(glowGeometry, glowMaterial);
@@ -479,37 +686,88 @@
             }
             animateHalo();
 
-            const sunPointLight = new THREE.PointLight(0xffddaa, 0.8, 300); // Reducido
+            const sunPointLight = new THREE.PointLight(0xffddaa, 1.0, 300); // Color cálido, intensidad media
             sunPointLight.position.copy(sunLight.position);
             scene.add(sunPointLight);
 
-            // Partículas de polvo atmosférico para belleza
-            const dustGeometry = new THREE.BufferGeometry();
-            const dustCount = 1000;
-            const dustPositions = new Float32Array(dustCount * 3);
-            for (let i = 0; i < dustCount; i++) {
+            // Luz ambiental cerca del planeta, suave
+            const planetPointLight = new THREE.PointLight(0xaaaaaa, 0.5, 100);
+            planetPointLight.position.set(0, 0, 0);
+            scene.add(planetPointLight);
+
+            // More particles for freezer planet - snow-like
+            const snowGeometry = new THREE.BufferGeometry();
+            const snowCount = 5000; // Increased
+            const snowPositions = new Float32Array(snowCount * 3);
+            const snowVelocities = new Float32Array(snowCount * 3); // Add velocities for falling
+            const snowColors = new Float32Array(snowCount * 3);
+            for (let i = 0; i < snowCount; i++) {
                 const i3 = i * 3;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos(2 * Math.random() - 1);
-                const r = originalPlanetRadius * (1 + Math.random() * 0.1); // Cerca del planeta
-                dustPositions[i3] = r * Math.sin(phi) * Math.cos(theta);
-                dustPositions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-                dustPositions[i3 + 2] = r * Math.cos(phi);
+                const r = originalPlanetRadius * (1 + Math.random() * 0.2); // Slightly farther
+                snowPositions[i3] = r * Math.sin(phi) * Math.cos(theta);
+                snowPositions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+                snowPositions[i3 + 2] = r * Math.cos(phi);
+                
+                // Velocity towards center for falling snow
+                const dir = new THREE.Vector3(snowPositions[i3], snowPositions[i3+1], snowPositions[i3+2]).normalize();
+                const speed = 0.5 + Math.random() * 1.0;
+                snowVelocities[i3] = -dir.x * speed;
+                snowVelocities[i3 + 1] = -dir.y * speed;
+                snowVelocities[i3 + 2] = -dir.z * speed;
+                
+                // White with blue tint
+                snowColors[i3] = 0.9 + Math.random() * 0.1;
+                snowColors[i3 + 1] = 0.9 + Math.random() * 0.1;
+                snowColors[i3 + 2] = 0.8 + Math.random() * 0.2;
             }
-            dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-            const dustMaterial = new THREE.PointsMaterial({
-                color: 0xaaaaaa,
-                size: 0.5,
+            snowGeometry.setAttribute('position', new THREE.BufferAttribute(snowPositions, 3));
+            snowGeometry.setAttribute('velocity', new THREE.BufferAttribute(snowVelocities, 3));
+            snowGeometry.setAttribute('color', new THREE.BufferAttribute(snowColors, 3));
+            const snowMaterial = new THREE.PointsMaterial({
+                size: 0.3,
+                vertexColors: true,
                 transparent: true,
-                opacity: 0.3
+                opacity: 0.6,
+                sizeAttenuation: true
             });
-            const dust = new THREE.Points(dustGeometry, dustMaterial);
-            scene.add(dust);
-            window.dust = dust; // Exponer para acceso global en shrinkPlanet
+            const snow = new THREE.Points(snowGeometry, snowMaterial);
+            scene.add(snow);
+            window.snow = snow; // Exponer para acceso global
+
+            // Cargar textura de piedra
+            const textureLoader = new THREE.TextureLoader();
+            stoneTexture = textureLoader.load('https://threejs.org/examples/textures/brick_diffuse.jpg'); // Textura de piedra/brick como ejemplo; reemplaza con una específica de piedra si tienes
 
             window.addEventListener('resize', updateAspectRatio);
 
             setInterval(updateUI, 100);
+        }
+
+        function loadMeteorLavaModel() {
+            const loader = new THREE.GLTFLoader();
+            loader.load('models/a.glb', function(gltf) {
+                meteorLavaTemplate = gltf.scene.clone();
+                meteorLavaTemplate.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                console.log('Meteor/Lava model loaded');
+                modelLoaded();
+            }, undefined, function(error) {
+                console.error('Error loading meteor/lava model:', error);
+                // Fallback: create a simple geometry for both
+                const fallbackGeo = new THREE.DodecahedronGeometry(1, 1);
+                const fallbackMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const fallbackModel = new THREE.Mesh(fallbackGeo, fallbackMat);
+                fallbackModel.userData.fallback = true;
+                meteorLavaTemplate = fallbackModel;
+                console.log('Fallback created for meteor/lava');
+                modelLoaded();
+            });
         }
 
         function loadPlaneta(radio, texturaURL) {
@@ -531,38 +789,6 @@
             // Bump map simulado para textura al encoger
             planeta.userData.originalScale = 1.0;
 
-            // Añadir rocas con mejor material
-            const numRocks = 300; // Más rocas
-            for (let i = 0; i < numRocks; i++) {
-                const rockRadius = 0.3 + Math.random() * 0.7;
-                const rockGeo = new THREE.DodecahedronGeometry(rockRadius, 1); // Mejor forma para rocas
-                const rockMat = new THREE.MeshStandardMaterial({ 
-                    color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 0.4, 0.2 + Math.random() * 0.3),
-                    roughness: 0.9,
-                    metalness: 0.1
-                });
-                const rock = new THREE.Mesh(rockGeo, rockMat);
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                const pos = new THREE.Vector3(
-                    radio * Math.sin(phi) * Math.cos(theta),
-                    radio * Math.sin(phi) * Math.sin(theta),
-                    radio * Math.cos(phi)
-                );
-                const offset = new THREE.Vector3(
-                    (Math.random() - 0.5) * 2,
-                    (Math.random() - 0.5) * 2,
-                    (Math.random() - 0.5) * 2
-                ).normalize().multiplyScalar(rockRadius);
-                pos.add(offset);
-                rock.position.copy(pos);
-                rock.userData.originalPosition = pos.clone();
-                rock.castShadow = true;
-                rock.receiveShadow = true;
-                scene.add(rock);
-                staticObstacles.push(rock);
-            }
-
             // Load tree model instead of procedural
             const treeLoader = new THREE.GLTFLoader();
             treeLoader.load('models/tree.glb', function(gltf) {
@@ -576,14 +802,8 @@
                 treeTemplate.scale.set(3, 3, 3); // Escala razonable para GLTF (ajusta según el tamaño de tu modelo; prueba 0.1-2.0)
 
                 const numTrees = 200; // Reducido para mejor rendimiento con escalas grandes
-                for (let i = 0; i < numTrees; i++) {
-                    const tree = treeTemplate.clone();
-                    tree.traverse((child) => {
-                        if (child.isMesh) {
-                            child.castShadow = true;
-                            child.receiveShadow = true;
-                        }
-                    });
+                let placedTrees = 0;
+                while (placedTrees < numTrees) {
                     const theta = Math.random() * Math.PI * 2;
                     const phi = Math.acos(2 * Math.random() - 1);
                     const pos = new THREE.Vector3(
@@ -591,6 +811,16 @@
                         radio * Math.sin(phi) * Math.sin(theta),
                         radio * Math.cos(phi)
                     );
+                    const distToPlayer = pos.distanceTo(playerInitialPos);
+                    if (distToPlayer < 10) continue; // Skip if too close to player
+
+                    const tree = treeTemplate.clone();
+                    tree.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
                     tree.position.copy(pos);
                     const radial = pos.clone().normalize();
                     const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
@@ -607,6 +837,7 @@
                     };
                     scene.add(tree);
                     staticObstacles.push(tree);
+                    placedTrees++;
                 }
                 console.log('Trees loaded from GLTF');
                 modelLoaded();
@@ -615,53 +846,14 @@
                 createProceduralTrees(radio); // Fallback a procedural si GLTF falla
             });
 
-            // Zonas de lava mejoradas con glow y partículas
-            const numLava = 200; // Más zonas
-            for (let i = 0; i < numLava; i++) {
-                const lavaRadius = 1.0; // Aumentado para más cobertura
-                const lavaGeo = new THREE.SphereGeometry(lavaRadius, 16, 16);
-                const lavaMat = new THREE.MeshStandardMaterial({ 
-                    color: 0xff4500,
-                    emissive: 0xff6600,
-                    emissiveIntensity: 0.8 // Más brillante
-                });
-                const lava = new THREE.Mesh(lavaGeo, lavaMat);
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                const pos = new THREE.Vector3(
-                    radio * Math.sin(phi) * Math.cos(theta),
-                    radio * Math.sin(phi) * Math.sin(theta),
-                    radio * Math.cos(phi)
-                );
-                lava.position.copy(pos);
-                lava.userData.originalPosition = pos.clone();
-                const radial = pos.clone().normalize();
-                const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
-                lava.quaternion.copy(quat);
-                lava.castShadow = true;
-                lava.receiveShadow = true;
-                scene.add(lava);
-                lavaSpots.push(lava);
-
-                // Partículas de humo para lava
-                const smokeGeo = new THREE.SphereGeometry(0.2, 4, 4);
-                const smokeMat = new THREE.MeshBasicMaterial({
-                    color: 0x444444,
-                    transparent: true,
-                    opacity: 0.3
-                });
-                const smoke = new THREE.Mesh(smokeGeo, smokeMat);
-                smoke.position.copy(lava.position);
-                smoke.position.add(new THREE.Vector3(0, lavaRadius + 0.5, 0));
-                scene.add(smoke);
-                lava.userData.smoke = smoke;
-            }
+            // No initial lava - only from meteors
         }
 
         function createProceduralTrees(radio) {
             // Fallback procedural trees
             const numTrees = 100;
-            for (let i = 0; i < numTrees; i++) {
+            let placedTrees = 0;
+            while (placedTrees < numTrees) {
                 const treeHeight = 3 + Math.random() * 2;
                 const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
                 const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
@@ -682,6 +874,9 @@
                     radio * Math.sin(phi) * Math.sin(theta),
                     radio * Math.cos(phi)
                 );
+                const distToPlayer = pos.distanceTo(playerInitialPos);
+                if (distToPlayer < 10) continue; // Skip if too close
+
                 tree.position.copy(pos);
                 const radial = pos.clone().normalize();
                 const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
@@ -697,41 +892,59 @@
                 tree.receiveShadow = true;
                 scene.add(tree);
                 staticObstacles.push(tree);
+                placedTrees++;
             }
             modelLoaded();
         }
 
         function spawnLava(position) {
-            const lavaRadius = 1.0;
-            const lavaGeo = new THREE.SphereGeometry(lavaRadius, 16, 16);
-            const lavaMat = new THREE.MeshStandardMaterial({ 
-                color: 0xff4500,
-                emissive: 0xff6600,
-                emissiveIntensity: 0.8
+            const lavaRadius = 1.0 + Math.random() * 0.3; // Reducido tamaño para que sea un poco más pequeña
+            // Improved shape: procedural blob-like icosahedron for better lava form
+            const lavaGeometry = new THREE.IcosahedronGeometry(lavaRadius, 3); // Higher detail for irregular shape
+            const lavaMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0.0 },
+                    baseColor: { value: new THREE.Color(0xff4500) } // Brighter orange-red for lava
+                },
+                vertexShader: lavaVertexShader,
+                fragmentShader: lavaFragmentShader,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide
             });
-            const lava = new THREE.Mesh(lavaGeo, lavaMat);
+            const lava = new THREE.Mesh(lavaGeometry, lavaMaterial);
+            lava.castShadow = true;
+            lava.receiveShadow = true;
+
             const radial = position.clone().normalize();
             lava.position.copy(position);
             const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
             lava.quaternion.copy(quat);
-            lava.castShadow = true;
-            lava.receiveShadow = true;
+
             scene.add(lava);
             lavaSpots.push(lava);
             lava.userData.originalPosition = position.clone().multiplyScalar(originalPlanetRadius / currentPlanetRadius);
+            lava.userData.pulseTime = Math.random() * Math.PI * 2;
 
-            // Partículas de humo para lava
-            const smokeGeo = new THREE.SphereGeometry(0.2, 4, 4);
-            const smokeMat = new THREE.MeshBasicMaterial({
-                color: 0x444444,
-                transparent: true,
-                opacity: 0.3
-            });
-            const smoke = new THREE.Mesh(smokeGeo, smokeMat);
-            smoke.position.copy(lava.position);
-            smoke.position.add(new THREE.Vector3(0, lavaRadius + 0.5, 0));
-            scene.add(smoke);
-            lava.userData.smoke = smoke;
+            // Partículas de humo más densas
+            for (let s = 0; s < 3; s++) {
+                const smokeGeo = new THREE.SphereGeometry(0.3, 4, 4);
+                const smokeMat = new THREE.MeshBasicMaterial({
+                    color: 0x222222,
+                    transparent: true,
+                    opacity: 0.4
+                });
+                const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+                smoke.position.copy(lava.position);
+                smoke.position.add(new THREE.Vector3(
+                    (Math.random() - 0.5) * lavaRadius,
+                    lavaRadius + 0.5 + Math.random(),
+                    (Math.random() - 0.5) * lavaRadius
+                ));
+                scene.add(smoke);
+                lava.userData.smokes = lava.userData.smokes || [];
+                lava.userData.smokes.push(smoke);
+            }
         }
 
         // --- SPAWN DE ENEMIGOS VARIADOS ---
@@ -744,12 +957,16 @@
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
-                            // Aplicar color tintado
+                            // Aplicar color tintado y textura metálica reflectante
                             if (child.material) {
                                 child.material = child.material.clone();
                                 child.material.color.set(type.color);
                                 child.material.emissive = new THREE.Color(type.color);
                                 child.material.emissiveIntensity = 0.3;
+                                child.material.metalness = 1.0; // Máximo metálico
+                                child.material.roughness = 0.1; // Bajo roughness para reflectividad
+                                child.material.transparent = true;
+                                child.material.opacity = 0.7;
                             }
                         }
                     });
@@ -758,17 +975,22 @@
                     modelLoaded();
                 }, undefined, function(error) {
                     console.error(`Error cargando modelo ${type.model}:`, error);
-                    // Fallback: Crear geometría procedural simple
+                    // Fallback: Crear geometría procedural simple con textura metálica
                     const fallbackGeometry = type.name === 'chaser' ? 
                         new THREE.SphereGeometry(0.5, 8, 8) :  // Esfera para chaser
                         (type.name === 'brute' ? 
                             new THREE.CylinderGeometry(0.6, 0.8, 1.2, 8) :  // Cilindro ancho para brute
                             new THREE.ConeGeometry(0.4, 1.5, 8)  // Cono para jumper
                         );
-                    const fallbackMaterial = new THREE.MeshStandardMaterial({ 
-                        color: type.color,
-                        emissive: type.color,
-                        emissiveIntensity: 0.5  // Glow fuerte para visibilidad
+                    const fallbackMaterial = new THREE.ShaderMaterial({ 
+                        uniforms: {
+                            time: { value: 0.0 },
+                            baseColor: { value: new THREE.Color(type.color) }
+                        },
+                        vertexShader: glitchVertexShader,
+                        fragmentShader: glitchFragmentShader,
+                        transparent: true,
+                        opacity: 0.7
                     });
                     const fallbackModel = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
                     fallbackModel.userData = { fallback: true };  // Marcar como fallback
@@ -782,25 +1004,32 @@
         function spawnEnemy() {
             if (!gameRunning || !isInitialized || Math.random() > ENEMY_SPAWN_RATE) return;
 
+            if (lavaSpots.length === 0) return; // No lava, no spawn
+
             const type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
             const modelTemplate = enemyModels[type.name];
             if (!modelTemplate) return;
+
+            // Spawn from random lava
+            const randomLava = lavaSpots[Math.floor(Math.random() * lavaSpots.length)];
+            const lavaPos = randomLava.position.clone();
 
             // TEST: Reemplaza con geometría simple para visibilidad (cambia true a false para usar modelo real)
             let enemy;
             if (true) {  // Cambia a false para usar modelo real
                 // Geometría fallback: esfera roja brillante para chaser, cilindro marrón para brute, cono magenta para jumper
-                const geo = type.name === 'chaser' ? new THREE.SphereGeometry(0.8, 8, 8) :
-                            type.name === 'brute' ? new THREE.CylinderGeometry(0.6, 1.0, 1.5, 8) :
-                            new THREE.ConeGeometry(0.5, 2.0, 8);
-                const mat = new THREE.MeshStandardMaterial({
-                    color: type.color,
-                    emissive: type.color,
-                    emissiveIntensity: 1.0,  // Muy brillante para test
+                const geo = new THREE.SphereGeometry(0.5, 8, 8); // Unified to sphere for easier shape changing
+                const enemyMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0.0 },
+                        baseColor: { value: new THREE.Color(type.color) }
+                    },
+                    vertexShader: glitchVertexShader,
+                    fragmentShader: glitchFragmentShader,
                     transparent: true,
-                    opacity: 0.9
+                    opacity: 0.7
                 });
-                enemy = new THREE.Mesh(geo, mat);
+                enemy = new THREE.Mesh(geo, enemyMaterial);
                 enemy.userData.fallback = true;  // Marca para animación extra
                 console.log(`Usando fallback para ${type.name}`);
             } else {
@@ -809,30 +1038,25 @@
 
             enemy.scale.set(type.scale, type.scale, type.scale);
 
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            // Reducir altura para que estén al nivel del jugador
-            const height = CHARACTER_HEIGHT; // 0.5, igual que el jugador
-            // Spawn más cerca para test: radio * 1.2
-            const spawnRadius = currentPlanetRadius * 1.2 + height;
-            const pos = new THREE.Vector3(
-                spawnRadius * Math.sin(phi) * Math.cos(theta),
-                spawnRadius * Math.sin(phi) * Math.sin(theta),
-                spawnRadius * Math.cos(phi)
-            );
+            // Position slightly above lava
+            const radial = lavaPos.clone().normalize();
+            const height = CHARACTER_HEIGHT;
+            const spawnRadius = currentPlanetRadius * 1.0 + height;
+            const pos = radial.clone().multiplyScalar(spawnRadius);
+            pos.add(new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2)); // Small offset
 
             enemy.position.copy(pos);
-            const radial = pos.clone().normalize();
             const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
             enemy.quaternion.copy(quat);
             enemy.userData = { 
                 radial: radial.clone(), 
-                speed: type.speed * 2,  // DUPLICA velocidad para test
+                speed: type.speed * 2.5,  // Aumentado multiplicador para más velocidad
                 behavior: type.behavior,
                 type: type.name,
                 height: height, // Usar la altura baja
                 isEnemy: true,
-                rotationSpeed: Math.random() * 0.5 + 0.5
+                rotationSpeed: Math.random() * 0.5 + 0.5,
+                shapeTime: Math.random() * Math.PI * 2 // For shape changing
             };
             
             // Asegura visibilidad: glow y sombras
@@ -842,6 +1066,10 @@
                     child.receiveShadow = true;
                     if (child.material) {
                         child.material.emissiveIntensity = 0.8;  // Aumenta glow
+                        child.material.metalness = 1.0;
+                        child.material.roughness = 0.1;
+                        child.material.transparent = true;
+                        child.material.opacity = 0.7;
                     }
                 }
             });
@@ -849,9 +1077,9 @@
             scene.add(enemy);
             enemies.push(enemy);
 
-            // Agregar trail naranja para visibilidad
+            // Agregar trail naranja para visibilidad, más largo para entretenimiento
             const trailPoints = [enemy.position.clone()];
-            for (let j = 1; j < 5; j++) {
+            for (let j = 1; j < 8; j++) { // Aumentado a 8 puntos
                 const backPos = enemy.position.clone().sub(radial.clone().multiplyScalar(j * 1));
                 trailPoints.push(backPos);
             }
@@ -861,7 +1089,7 @@
             scene.add(trail);
             enemy.userData.trail = trail;
 
-            console.log(`Enemigo ${type.name} spawn en posición:`, pos);
+            console.log(`Enemigo ${type.name} spawn from lava en posición:`, pos);
         }
 
         function loadPersonaje(url, scale = 1.0) {
@@ -869,7 +1097,7 @@
             loader.load(url, function(fbx) {
                 personaje = fbx;
                 personaje.scale.set(scale, scale, scale);
-                const initialPos = new THREE.Vector3(0, originalPlanetRadius + CHARACTER_HEIGHT, 0);
+                const initialPos = playerInitialPos.clone();
                 personaje.position.copy(initialPos);
                 
                 const initialRadial = initialPos.clone().normalize();
@@ -967,7 +1195,6 @@
             // Indicadores informativos
             const invulnEl = document.getElementById('invulnIndicator');
             const lavaEl = document.getElementById('lavaWarning');
-            const cooldownEl = document.getElementById('shrinkCooldown');
             if (invulnerable) {
                 invulnEl.style.display = 'block';
             } else {
@@ -978,20 +1205,6 @@
             } else {
                 lavaEl.style.display = 'none';
             }
-            if (gameTime - lastShrinkTime < SHRINK_COOLDOWN) {
-                cooldownEl.style.display = 'block';
-            } else {
-                cooldownEl.style.display = 'none';
-            }
-        }
-
-        function attemptShrinkPlanet() {
-            const timeSinceLastShrink = gameTime - lastShrinkTime;
-            if (timeSinceLastShrink < SHRINK_COOLDOWN) {
-                return; // No encoger si en cooldown
-            }
-            shrinkPlanet();
-            lastShrinkTime = gameTime;
         }
 
         function shrinkPlanet() {
@@ -1027,9 +1240,15 @@
                 if (lava.userData && lava.userData.originalPosition) {
                     const newPos = lava.userData.originalPosition.clone().multiplyScalar(currentPlanetRadius / originalPlanetRadius);
                     lava.position.copy(newPos);
-                    if (lava.userData.smoke) {
-                        lava.userData.smoke.position.copy(newPos);
-                        lava.userData.smoke.position.add(new THREE.Vector3(0, 1.0 + 0.5, 0)); // Ajustar altura
+                    if (lava.userData.smokes) {
+                        lava.userData.smokes.forEach(smoke => {
+                            smoke.position.copy(newPos);
+                            smoke.position.add(new THREE.Vector3(
+                                (Math.random() - 0.5) * 1.0,
+                                1.0 + 0.5 + Math.random(),
+                                (Math.random() - 0.5) * 1.0
+                            ));
+                        });
                     }
                 }
             }
@@ -1049,17 +1268,15 @@
                 enemy.userData.radial = adjustedPos.clone().normalize();
             }
 
-            // Ajustar polvo atmosférico
-            if (window.dust) {
-                const positions = window.dust.geometry.attributes.position.array;
-                for (let i = 0; i < positions.length; i += 3) {
-                    const len = Math.sqrt(positions[i]**2 + positions[i+1]**2 + positions[i+2]**2);
-                    const dir = new THREE.Vector3(positions[i], positions[i+1], positions[i+2]).normalize();
-                    positions[i] = dir.x * currentPlanetRadius * (1 + (len - originalPlanetRadius) / originalPlanetRadius * 0.1);
-                    positions[i+1] = dir.y * currentPlanetRadius * (1 + (len - originalPlanetRadius) / originalPlanetRadius * 0.1);
-                    positions[i+2] = dir.z * currentPlanetRadius * (1 + (len - originalPlanetRadius) / originalPlanetRadius * 0.1);
-                }
-                window.dust.geometry.attributes.position.needsUpdate = true;
+            // Actualizar bounds de la cámara de sombras para adaptarse al radio actual del planeta (esférico)
+            if (sunLight && sunLight.shadow && sunLight.shadow.camera) {
+                const shadowCamera = sunLight.shadow.camera;
+                const shadowSize = currentPlanetRadius * 3;
+                shadowCamera.left = -shadowSize;
+                shadowCamera.right = shadowSize;
+                shadowCamera.top = shadowSize;
+                shadowCamera.bottom = -shadowSize;
+                shadowCamera.updateProjectionMatrix();
             }
 
             if (currentPlanetRadius <= WIN_RADIUS) {
@@ -1092,7 +1309,7 @@
 
         // --- SPAWN DE METEORITOS CON TRAIL MEJORADO ---
         function spawnMeteor() {
-            if (!isInitialized || !gameRunning || Math.random() > METEOR_SPAWN_RATE) return;
+            if (!isInitialized || !gameRunning || Math.random() > METEOR_SPAWN_RATE || !meteorLavaTemplate) return;
 
             const spawnRadius = currentPlanetRadius * 5; // Aumentado para spawns más lejanos, pero speed compensa
             const theta = Math.random() * Math.PI * 2;
@@ -1101,23 +1318,26 @@
             const y = spawnRadius * Math.sin(phi) * Math.sin(theta);
             const z = spawnRadius * Math.cos(phi);
 
-            const meteorGeometry = new THREE.DodecahedronGeometry(METEOR_RADIUS, 1); // Mejor forma
-            const meteorMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x8B4513,
-                emissive: 0xFF4500,
-                emissiveIntensity: 0.5 // Más glow
+            const meteor = meteorLavaTemplate.clone();
+            meteor.scale.set(METEOR_RADIUS, METEOR_RADIUS, METEOR_RADIUS);
+            meteor.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = new THREE.MeshStandardMaterial({ 
+                        color: 0x8B4513,
+                        emissive: 0xFF4500,
+                        emissiveIntensity: 0.5 // Más glow
+                    });
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
             });
-            const meteor = new THREE.Mesh(meteorGeometry, meteorMaterial);
-            meteor.castShadow = true;
-            meteor.receiveShadow = true;
-
             meteor.position.set(x, y, z);
             const direction = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), meteor.position).normalize();
             meteor.userData = { direction: direction, speed: METEOR_SPEED, isMeteor: true };
 
-            // Trail mejorado con múltiples segmentos
+            // Trail mejorado con múltiples segmentos, más largo para entretenimiento
             const trailPoints = [];
-            for (let j = 0; j < 10; j++) {
+            for (let j = 0; j < 15; j++) { // Aumentado a 15
                 trailPoints.push(meteor.position.clone().add(direction.clone().multiplyScalar(-j * 2)));
             }
             const trailGeometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
@@ -1166,6 +1386,22 @@
         }
 
         function updateObstacles(deltaTime) {
+            const currentTime = clock.getElapsedTime();
+            for (let lava of lavaSpots) {
+                if (lava.material && lava.material.uniforms && lava.material.uniforms.time) {
+                    lava.material.uniforms.time.value = currentTime;
+                }
+                lava.userData.pulseTime += deltaTime * 2;
+                lava.scale.setScalar(1 + Math.sin(lava.userData.pulseTime) * 0.2); // Pulsación para intimidación
+                if (lava.userData.smokes) {
+                    lava.userData.smokes.forEach((smoke, index) => {
+                        smoke.position.y += Math.sin(clock.getElapsedTime() * 2 + index) * 0.02;
+                        smoke.rotation.y += deltaTime * 1;
+                        smoke.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 3 + index) * 0.1); // Animación extra
+                    });
+                }
+            }
+
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 const obs = obstacles[i];
                 if (obs.userData.isMeteor) {
@@ -1196,18 +1432,10 @@
                 }
             }
 
-            // Actualizar power-ups (rotación y pulso)
+            // Actualizar power-ups (rotación y pulso más rápido para entretenimiento)
             for (let pu of powerUps) {
-                pu.rotation.y += deltaTime * 2;
-                pu.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 3) * 0.2);
-            }
-
-            // Animar humo de lava
-            for (let lava of lavaSpots) {
-                if (lava.userData.smoke) {
-                    lava.userData.smoke.position.y += Math.sin(clock.getElapsedTime() * 2 + lava.position.x) * 0.01;
-                    lava.userData.smoke.rotation.y += deltaTime * 0.5;
-                }
+                pu.rotation.y += deltaTime * 4; // Más rápido
+                pu.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 5) * 0.3); // Pulso más intenso
             }
 
             // Actualizar enemigos variados
@@ -1215,6 +1443,9 @@
                 const playerPos = personaje.position.clone();
                 for (let i = enemies.length - 1; i >= 0; i--) {
                     const enemy = enemies[i];
+                    if (enemy.material && enemy.material.uniforms && enemy.material.uniforms.time) {
+                        enemy.material.uniforms.time.value = currentTime;
+                    }
                     const enemyPos = enemy.position.clone();
                     const radial = enemyPos.clone().normalize();
 
@@ -1229,10 +1460,10 @@
                         direction.normalize();
                     }
 
-                    // Para jumper, agregar salto ocasional en dirección radial
+                    // Para jumper, agregar salto ocasional en dirección radial más frecuente
                     let jumpOffset = new THREE.Vector3(0, 0, 0);
-                    if (enemy.userData.behavior === 'jump' && Math.random() < 0.02) {
-                        jumpOffset = radial.clone().multiplyScalar(3.0); // Salto radial más visible
+                    if (enemy.userData.behavior === 'jump' && Math.random() < 0.05) { // Aumentado a 0.05
+                        jumpOffset = radial.clone().multiplyScalar(4.0); // Salto más alto
                     }
 
                     const moveVec = direction.clone().multiplyScalar(enemy.userData.speed * deltaTime);
@@ -1246,13 +1477,17 @@
                         enemy.userData.radial.copy(newRadial);
                     }
 
-                    // Rotación para variedad
-                    enemy.rotation.y += deltaTime * (1 + Math.random());
+                    // Rotación para variedad más rápida
+                    enemy.rotation.y += deltaTime * (2 + Math.random());
 
-                    // Animación extra para fallback o todos
+                    // Animación extra para fallback o todos, más dinámica
                     if (enemy.userData.fallback || true) {
-                        enemy.rotation.x += deltaTime * enemy.userData.rotationSpeed * 0.5;
-                        enemy.rotation.z += Math.sin(gameTime * 2 + i) * deltaTime * 0.2;  // Bobbing para "vida"
+                        enemy.rotation.x += deltaTime * enemy.userData.rotationSpeed * 0.8;
+                        enemy.rotation.z += Math.sin(gameTime * 3 + i) * deltaTime * 0.3;  // Bobbing más rápido
+                        // Shape changing: scale variation to simulate morphing
+                        enemy.userData.shapeTime += deltaTime * 3;
+                        const shapeScale = 1 + Math.sin(enemy.userData.shapeTime) * 0.3;
+                        enemy.scale.setScalar(shapeScale);
                         // Actualiza trail si existe
                         if (enemy.userData.trail) {
                             const points = enemy.userData.trail.geometry.attributes.position.array;
@@ -1289,8 +1524,8 @@
             scene.add(explosion);
             explosions.push(explosion);
 
-            // Partículas de explosión para belleza
-            for (let k = 0; k < 20; k++) {
+            // Partículas de explosión para belleza, más partículas para entretenimiento
+            for (let k = 0; k < 30; k++) { // Aumentado a 30
                 const particleGeo = new THREE.SphereGeometry(0.1, 4, 4);
                 const particleMat = new THREE.MeshBasicMaterial({
                     color: 0xFF6600,
@@ -1300,7 +1535,7 @@
                 const particle = new THREE.Mesh(particleGeo, particleMat);
                 particle.position.copy(position);
                 const dir = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-                particle.userData = { velocity: dir.multiplyScalar(10), life: 1.0 };
+                particle.userData = { velocity: dir.multiplyScalar(15), life: 1.5 }; // Velocidad y vida aumentadas
                 scene.add(particle);
                 explosions.push(particle);
             }
@@ -1381,7 +1616,7 @@
             if (!lavaSpots || lavaSpots.length === 0) return;
             let inLavaNow = false;
             for (let lava of lavaSpots) {
-                if (lava && lava.position && characterPos.distanceTo(lava.position) < 1.5) {
+                if (lava && lava.position && characterPos.distanceTo(lava.position) < 1.5) { // Ajustado para tamaño más pequeño
                     inLavaNow = true;
                     break;
                 }
@@ -1423,16 +1658,22 @@
                 gameTime += deltaTime;
                 score += SCORE_PER_SECOND * deltaTime;
 
+                // Auto shrink
+                if (gameTime - lastAutoShrinkTime >= AUTO_SHRINK_INTERVAL) {
+                    shrinkPlanet();
+                    lastAutoShrinkTime = gameTime;
+                }
+
                 const currentSecond = Math.floor(gameTime);
                 if (currentSecond > lastSecond) {
-                    METEOR_SPAWN_RATE = Math.min(0.05, METEOR_SPAWN_RATE + 0.002); // Aumento más rápido
-                    ENEMY_SPAWN_RATE = Math.min(0.01, ENEMY_SPAWN_RATE + 0.0005); // Aumento para enemigos
+                    METEOR_SPAWN_RATE = Math.min(0.06, METEOR_SPAWN_RATE + 0.003); // Aumento más rápido
+                    ENEMY_SPAWN_RATE = Math.min(0.012, ENEMY_SPAWN_RATE + 0.0008); // Aumento más rápido sin exceder
                     lastSecond = currentSecond;
                 }
 
                 const currentInterval = Math.floor(gameTime / DIFFICULTY_INCREASE_INTERVAL);
                 if (currentInterval > lastDifficultyIncrease) {
-                    POWERUP_SPAWN_RATE = Math.min(0.005, POWERUP_SPAWN_RATE + 0.0002);
+                    POWERUP_SPAWN_RATE = Math.min(0.0003, POWERUP_SPAWN_RATE + 0.0001); // Menos powerups
                     lastDifficultyIncrease = currentInterval;
                 }
 
@@ -1503,6 +1744,35 @@
                         }
                     }
                 }
+            }
+
+            // Update snow particles continuously
+            if (window.snow) {
+                const positions = window.snow.geometry.attributes.position.array;
+                const velocities = window.snow.geometry.attributes.velocity.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i] += velocities[i] * deltaTime;
+                    positions[i+1] += velocities[i+1] * deltaTime;
+                    positions[i+2] += velocities[i+2] * deltaTime;
+                    
+                    // Reset if too close to center
+                    const len = Math.sqrt(positions[i]**2 + positions[i+1]**2 + positions[i+2]**2);
+                    if (len < currentPlanetRadius * 0.9) {
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos(2 * Math.random() - 1);
+                        const r = currentPlanetRadius * 1.2;
+                        positions[i] = r * Math.sin(phi) * Math.cos(theta);
+                        positions[i+1] = r * Math.sin(phi) * Math.sin(theta);
+                        positions[i+2] = r * Math.cos(phi);
+                        
+                        const dir = new THREE.Vector3(positions[i], positions[i+1], positions[i+2]).normalize();
+                        const speed = 0.5 + Math.random() * 1.0;
+                        velocities[i] = -dir.x * speed;
+                        velocities[i+1] = -dir.y * speed;
+                        velocities[i+2] = -dir.z * speed;
+                    }
+                }
+                window.snow.geometry.attributes.position.needsUpdate = true;
             }
         }
 
