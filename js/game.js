@@ -441,13 +441,12 @@ function init() {
     window.addEventListener('resize', updateAspectRatio);
 
     // GUI Setup
-    // GUI Setup
-var gui = new dat.GUI({ autoPlace: false });  // Desactiva el posicionamiento automático
-document.body.appendChild(gui.domElement);    // Añádelo al body para que sea global
-gui.domElement.style.position = 'fixed';      // Fijo al viewport
-gui.domElement.style.bottom = '5%';         // Margen inferior de 10px
-gui.domElement.style.right = '10px';          // Margen derecho de 10px
-gui.domElement.style.zIndex = '1000';         // Encima de otros elementos
+    var gui = new dat.GUI({ autoPlace: false });
+    document.body.appendChild(gui.domElement);
+    gui.domElement.style.position = 'fixed';
+    gui.domElement.style.bottom = '5%';         // Margen inferior de 10px
+    gui.domElement.style.right = '10px';        // Margen derecho de 10px
+    gui.domElement.style.zIndex = '1000';       // Encima de otros elementos
 
     // Planet Folder
     var guiPlanet = gui.addFolder('Planet');
