@@ -238,7 +238,7 @@ function regenerateTrees(num) {
         child.receiveShadow = true;
       }
     });
-    const scaleFactor = 2 + Math.random() * 3; // Random scale between 2 and 5
+    const scaleFactor = 2 + Math.random() * 3;
     tree.scale.set(scaleFactor, scaleFactor, scaleFactor);
     tree.position.copy(pos);
     const radial = pos.clone().normalize();
@@ -247,7 +247,7 @@ function regenerateTrees(num) {
     tree.castShadow = true;
     tree.receiveShadow = true;
 
-    const treeOffset = CHARACTER_HEIGHT + scaleFactor * 1.333; // Adjusted offset based on scale (approx 4/3 for base 3)
+    const treeOffset = CHARACTER_HEIGHT + scaleFactor * 1.333;
     tree.position.add(radial.clone().multiplyScalar(treeOffset));
     tree.userData = {
       isTree: true,
