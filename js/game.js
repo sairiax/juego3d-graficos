@@ -120,6 +120,7 @@ let isInitialized = false;
 
 // Meteor/Lava model template
 let meteorLavaTemplate;
+let treeTemplate; // Global for regeneration
 
 // Player initial position
 const playerInitialPos = new THREE.Vector3(0, 40 + 0.5, 0);
@@ -181,6 +182,16 @@ document.addEventListener('keyup', (event) => keysPressed[event.key.toLowerCase(
 
 let personaje;
 
+// GUI Controls
+var controls = {
+  planetRadius: originalPlanetRadius,
+  numTrees: 100,
+  meteorSpawnRate: METEOR_SPAWN_RATE,
+  enemySpawnRate: ENEMY_SPAWN_RATE,
+  powerupSpawnRate: POWERUP_SPAWN_RATE,
+  forwardSpeed: FORWARD_SPEED
+};
+
 init();
 loadPlaneta(originalPlanetRadius, 'images/planet.png');
 loadPersonaje('models/c.fbx', CHARACTER_SCALE);
@@ -195,6 +206,59 @@ function modelLoaded() {
         document.getElementById('loading').style.display = 'none';
         console.log('All models loaded');
     }
+}
+
+function regenerateTrees(num) {
+  // Remove existing trees
+  staticObstacles.forEach(tree => scene.remove(tree));
+  staticObstacles = [];
+
+  if (!treeTemplate) {
+    createProceduralTrees(currentPlanetRadius, num);
+    return;
+  }
+
+  let placedTrees = 0;
+  const radio = currentPlanetRadius;
+  while (placedTrees < num) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const pos = new THREE.Vector3(
+      radio * Math.sin(phi) * Math.cos(theta),
+      radio * Math.sin(phi) * Math.sin(theta),
+      radio * Math.cos(phi)
+    );
+    const distToPlayer = pos.distanceTo(playerInitialPos);
+    if (distToPlayer < 10) continue;
+
+    const tree = treeTemplate.clone();
+    tree.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    const scaleFactor = 2 + Math.random() * 3; // Random scale between 2 and 5
+    tree.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    tree.position.copy(pos);
+    const radial = pos.clone().normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+    tree.quaternion.copy(quat);
+    tree.castShadow = true;
+    tree.receiveShadow = true;
+
+    const treeOffset = CHARACTER_HEIGHT + scaleFactor * 1.333; // Adjusted offset based on scale (approx 4/3 for base 3)
+    tree.position.add(radial.clone().multiplyScalar(treeOffset));
+    tree.userData = {
+      isTree: true,
+      radial: radial.clone(),
+      offset: treeOffset
+    };
+    scene.add(tree);
+    staticObstacles.push(tree);
+    placedTrees++;
+  }
+  console.log(`${num} trees regenerated`);
 }
 
 function init() {
@@ -376,6 +440,52 @@ function init() {
     stoneTexture = textureLoader.load('https://threejs.org/examples/textures/brick_diffuse.jpg');
     window.addEventListener('resize', updateAspectRatio);
 
+    // GUI Setup
+    var gui = new dat.GUI();
+    gui.domElement.style.position = 'absolute';
+    gui.domElement.style.bottom = '-500px';
+    gui.domElement.style.right = '10px';
+    gui.domElement.style.zIndex = '1000';
+
+    // Planet Folder
+    var guiPlanet = gui.addFolder('Planet');
+    guiPlanet.add(controls, 'planetRadius', WIN_RADIUS, 100).name("Radius").onChange(function(value) {
+      currentPlanetRadius = value;
+      planeta.scale.setScalar(value / originalPlanetRadius);
+      // Update static obstacles positions
+      for (let obj of staticObstacles) {
+        if (obj.userData && obj.userData.isTree) {
+          const targetDist = value + obj.userData.offset;
+          obj.position.copy(obj.userData.radial.clone().multiplyScalar(targetDist));
+        }
+      }
+      // Update shadow camera
+      if (sunLight && sunLight.shadow && sunLight.shadow.camera) {
+        const shadowSize = value * 3;
+        const shadowCamera = sunLight.shadow.camera;
+        shadowCamera.left = -shadowSize;
+        shadowCamera.right = shadowSize;
+        shadowCamera.top = shadowSize;
+        shadowCamera.bottom = -shadowSize;
+        shadowCamera.updateProjectionMatrix();
+      }
+    });
+    guiPlanet.add(controls, 'numTrees', 50, 200).name("Num Trees").onChange(regenerateTrees);
+    guiPlanet.open();
+
+    // Spawn Rates Folder
+    var guiSpawn = gui.addFolder('Spawn Rates');
+    guiSpawn.add(controls, 'meteorSpawnRate', 0, 10.0).name("Meteor Rate").onChange(function(value) {
+      METEOR_SPAWN_RATE = value;
+    });
+    guiSpawn.add(controls, 'enemySpawnRate', 0, 1.00).name("Enemy Rate").onChange(function(value) {
+      ENEMY_SPAWN_RATE = value;
+    });
+    guiSpawn.add(controls, 'powerupSpawnRate', 0, 1.00).name("Powerup Rate").onChange(function(value) {
+      POWERUP_SPAWN_RATE = value;
+    });
+    guiSpawn.open();
+
     setInterval(updateUI, 100);
 }
 
@@ -425,7 +535,7 @@ function loadPlaneta(radio, texturaURL) {
     // Load tree model instead of procedural
     const treeLoader = new THREE.GLTFLoader();
     treeLoader.load('models/tree.glb', function(gltf) {
-        const treeTemplate = gltf.scene.clone();
+        treeTemplate = gltf.scene.clone();
         treeTemplate.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
@@ -434,7 +544,7 @@ function loadPlaneta(radio, texturaURL) {
         });
         treeTemplate.scale.set(3, 3, 3);
 
-        const numTrees = 100;
+        const numTrees = controls.numTrees;
         let placedTrees = 0;
         while (placedTrees < numTrees) {
             const theta = Math.random() * Math.PI * 2;
@@ -454,6 +564,8 @@ function loadPlaneta(radio, texturaURL) {
                     child.receiveShadow = true;
                 }
             });
+            const scaleFactor = 2 + Math.random() * 3; // Random scale between 2 and 5
+            tree.scale.set(scaleFactor, scaleFactor, scaleFactor);
             tree.position.copy(pos);
             const radial = pos.clone().normalize();
             const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
@@ -461,7 +573,7 @@ function loadPlaneta(radio, texturaURL) {
             tree.castShadow = true;
             tree.receiveShadow = true;
 
-            const treeOffset = CHARACTER_HEIGHT + 4;
+            const treeOffset = CHARACTER_HEIGHT + scaleFactor * 1.333; // Adjusted offset based on scale (approx 4/3 for base 3)
             tree.position.add(radial.clone().multiplyScalar(treeOffset));
             tree.userData = {
                 isTree: true,
@@ -476,16 +588,15 @@ function loadPlaneta(radio, texturaURL) {
         modelLoaded();
     }, undefined, function(error) {
         console.error('Error loading tree model:', error);
-        createProceduralTrees(radio);
+        createProceduralTrees(radio, controls.numTrees);
     });
 }
 
-function createProceduralTrees(radio) {
+function createProceduralTrees(radio, num = 100) {
     // Fallback procedural trees
-    const numTrees = 100;
+    const numTrees = num;
     let placedTrees = 0;
     while (placedTrees < numTrees) {
-        const treeHeight = 3 + Math.random() * 2;
         const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
@@ -496,7 +607,9 @@ function createProceduralTrees(radio) {
         const tree = new THREE.Group();
         tree.add(trunk);
         tree.add(foliage);
-        tree.scale.set(1, treeHeight / 3, 1);
+
+        const scaleFactor = 2 + Math.random() * 3; // Random scale between 2 and 5
+        tree.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
@@ -512,7 +625,7 @@ function createProceduralTrees(radio) {
         const radial = pos.clone().normalize();
         const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
         tree.quaternion.copy(quat);
-        const treeOffset = CHARACTER_HEIGHT;
+        const treeOffset = CHARACTER_HEIGHT + scaleFactor * 1.333; // Adjusted offset based on scale
         tree.position.add(radial.clone().multiplyScalar(treeOffset));
         tree.userData = {
             isTree: true,
