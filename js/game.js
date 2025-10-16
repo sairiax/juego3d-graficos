@@ -262,6 +262,15 @@ function regenerateTrees(num) {
 }
 
 function init() {
+
+    stats = new Stats();
+    stats.showPanel(0); // 0: fps, 1: ms, 2: mb
+    stats.dom.style.position = 'absolute';
+    stats.dom.style.top = '20px';
+    stats.dom.style.right = '20px';
+    stats.dom.style.left = 'auto';
+    document.body.appendChild(stats.dom);
+
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(new THREE.Color(0x000011));
@@ -1536,8 +1545,10 @@ function updateCamera() {
 }
 
 function render() {
+    if (stats) stats.begin();
     requestAnimationFrame(render);
     update();
     renderer.render(scene, camera);
     minimapRenderer.render(scene, minimapCamera);
+    if(stats) stats.end();
 }
